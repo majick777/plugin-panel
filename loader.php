@@ -1,22 +1,21 @@
 <?php
 
-// ===========================
-// === Plugin Loader Class ===
-// ===========================
+// =====================================
+// === WordQuest Plugin Loader Class ===
+// =====================================
 //
 // --------------
-// Version: 1.0.5
+// Version: 1.0.6
 // --------------
 // * changelog at end of file! *
-
-
+//
+// =============
 // Loader Usage:
 // =============
-// 1. replace all occurrences of automedic in this file with the plugin namespace
-// 2. define plugin options, default settings, and setup arguments in the plugin file
-// 3. after definitions, require this file in the main plugin file (example below)
-
-
+// 1. replace all occurrences of PREFIX_ in this file with the plugin namespace prefix eg. my_plugin_
+// 2. define plugin options, default settings, and setup arguments your main plugin file
+// 3. require this file in the main plugin file and instantiate the loader class (see example below)
+//
 // ---------------------------
 // Plugin Options and Defaults
 // ---------------------------
@@ -80,15 +79,15 @@
 // Start Plugin Loader Instance
 // ----------------------------
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new {NAMESPACE}_loader($args);				// instantiates loader class
-// (eg. replace {NAMESPACE} with my_plugin_namespace etc.)
+// $instance = new PREFIX_loader($args);					// instantiates loader class
+// (ie. search and replace 'PREFIX_' with 'my_plugin_')
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-class csidebars_loader {
+class PREFIX_loader {
 
 	public $args = null;
 	public $namespace = null;
@@ -102,6 +101,8 @@ class csidebars_loader {
 	function __construct($args) {
 
 		// --- set plugin options ---
+		// 1.0.6: added options filter
+		$args['options'] = apply_filters($args['namespace'].'_options', $args['options']);
 		$this->options = $args['options']; unset($args['options']);
 
 		// --- set plugin args and namespace ---
@@ -350,7 +351,8 @@ class csidebars_loader {
 				if (isset($values['options'])) {$valid = $values['options'];}
 
 				// --- get posted value ---
-				$postkey = $args['settings'].'_'.$key;
+				// 1.0.6: set null value for unchecked checkbox fix
+				$posted = null; $postkey = $args['settings'].'_'.$key;
 				if (isset($_POST[$postkey])) {$posted = $_POST[$postkey];}
 
 				// --- sanitize value according to type ---
@@ -369,19 +371,21 @@ class csidebars_loader {
 				} elseif ($type == 'checkbox') {
 
 					// --- checkbox ---
+					// 1.0.6: fix to new unchecked checkbox value
 					$valid = array('', 'yes', '1', 'checked');
 					if (in_array($posted, $valid)) {$settings[$key] = $posted;}
+					elseif (is_null($posted)) {$settings[$key] = '';}
 
 				} elseif ($type == 'numeric') {
 
 					// --- number / numeric text ---
 					$posted = absint($posted);
-					if (is_numeric($posted)) {$settings[$key] = $posted;}
+					$settings[$key] = $posted;
 
 				} elseif ($type == 'alphanumeric') {
 
 					// --- alphanumeric text only ---
-					// TODO: maybe improve on this check?
+					// TODO: maybe improve on this check ?
 					$checkposted = preg_match('/^[a-zA-Z0-9_]+$/', $posted);
 					if ($checkposted) {$settings[$key] = $posted;}
 
@@ -401,8 +405,21 @@ class csidebars_loader {
 
 					// --- email address ---
 					// 1.0.3: added email option type checking
-					$posted = sanitize_email($posted);
+					$posted = sanitize_email(trim($posted));
 					if ($posted) {$settings[$key] = $posted;} else {$settings[$key] = '';}
+
+				} elseif ($type == 'emails') {
+
+					// --- email address list ---
+					// 1.0.6: added comma separated email list option type
+					if (strstr($posted, ',')) {$emails = explode($posted, ',');}
+					else {$emails = array(trim($posted));}
+					foreach ($emails as $i => $email) {
+						$email = sanitize_email(trim($email));
+						if (!empty($email) && $email) {$emails[$i] = $email;} else {unset($emails[$i]);}
+					}
+					if (count($emails) > 0) {$settings[$key] = implode($emails, ',');}
+					else {$settings[$key] = '';}
 
 				} elseif ($type == 'usernames') {
 
@@ -410,7 +427,7 @@ class csidebars_loader {
 					// 1.0.3: added username option type checking
 					$usernames = array();
 					if (strstr($posted, ',')) {$usernames = explode(',', $posted);}
-					else {$usernames[0] = trim($posted);}
+					else {$usernames = array(trim($posted));}
 					foreach ($usernames as $i => $username) {
 						$username = trim($username);
 						$user = get_user_by('login', $username);
@@ -419,12 +436,14 @@ class csidebars_loader {
 					if (count($usernames) > 0) {$settings[$key] = implode(',', $usernames);}
 					else {$settings[$key] = '';}
 
-				} elseif ($vtype == 'url') {
+				} elseif ($type == 'url') {
+					// 1.0.6: fix to type variable typo (vtype)
 
 					// --- URL address ---
 					// 1.0.4: added validated URL option
 					// TODO: maybe replace with a regex URL filter ?
-					$url = filter_var($vposted, FILTER_SANITIZE_STRING);
+					// 1.0.6: fix to posted variable type (vposted)
+					$url = filter_var($posted, FILTER_SANITIZE_STRING);
 					if ( (substr($url, 0, 4) != 'http') || !filter_var($url, FILTER_VALIDATE_URL)) {$posted = '';}
 					$settings[$key] = $posted;
 
@@ -1040,17 +1059,17 @@ class csidebars_loader {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action('plugins_loaded', 'csidebars_load_prefixed_functions', 0);
+add_action('plugins_loaded', 'PREFIX_load_prefixed_functions', 0);
 
-function csidebars_load_prefixed_functions() {
+function PREFIX_load_prefixed_functions() {
 
 	// auto-magic namespacing note
 	// ---------------------------
 	// all function names suffixes here must be two words for the magic namespace grabber to work
 	// ie. _add_settings, because the namespace is taken from before the second-last underscore
 
-	if (!function_exists('csidebars_loader_instance')) {
-		function csidebars_loader_instance() {
+	if (!function_exists('PREFIX_loader_instance')) {
+		function PREFIX_loader_instance() {
 			$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 			return $GLOBALS[$namespace.'_instance'];
 		}
@@ -1059,8 +1078,8 @@ function csidebars_load_prefixed_functions() {
 	// ------------
 	// Add Settings
 	// ------------
-	if (!function_exists('csidebars_add_settings')) {
-	 function csidebars_add_settings() {
+	if (!function_exists('PREFIX_add_settings')) {
+	 function PREFIX_add_settings() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->add_settings();
@@ -1070,8 +1089,8 @@ function csidebars_load_prefixed_functions() {
 	// ------------
 	// Get Defaults
 	// ------------
-	if (!function_exists('csidebars_default_settings')) {
-	 function csidebars_default_settings($key=false) {
+	if (!function_exists('PREFIX_default_settings')) {
+	 function PREFIX_default_settings($key=false) {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->default_settings($key);
@@ -1081,8 +1100,8 @@ function csidebars_load_prefixed_functions() {
 	// -----------
 	// Get Options
 	// -----------
-	if (!function_exists('csidebars_get_options')) {
-	 function csidebars_get_options() {
+	if (!function_exists('PREFIX_get_options')) {
+	 function PREFIX_get_options() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->options;
@@ -1092,8 +1111,8 @@ function csidebars_load_prefixed_functions() {
 	// -----------
 	// Get Setting
 	// -----------
-	if (!function_exists('csidebars_get_setting')) {
-	 function csidebars_get_setting($key, $filter=true) {
+	if (!function_exists('PREFIX_get_setting')) {
+	 function PREFIX_get_setting($key, $filter=true) {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->get_setting($key, $filter);
@@ -1103,8 +1122,8 @@ function csidebars_load_prefixed_functions() {
 	// --------------
 	// Reset Settings
 	// --------------
-	if (!function_exists('csidebars_reset_settings')) {
-	 function csidebars_reset_settings() {
+	if (!function_exists('PREFIX_reset_settings')) {
+	 function PREFIX_reset_settings() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->reset_settings();
@@ -1114,8 +1133,8 @@ function csidebars_load_prefixed_functions() {
 	// ---------------
 	// Update Settings
 	// ---------------
-	if (!function_exists('csidebars_update_settings')) {
-	 function csidebars_update_settings() {
+	if (!function_exists('PREFIX_update_settings')) {
+	 function PREFIX_update_settings() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->update_settings();
@@ -1125,8 +1144,8 @@ function csidebars_load_prefixed_functions() {
 	// ---------------
 	// Delete Settings
 	// ---------------
-	if (!function_exists('csidebars_delete_settings')) {
-	 function csidebars_delete_settings() {
+	if (!function_exists('PREFIX_delete_settings')) {
+	 function PREFIX_delete_settings() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->delete_settings();
@@ -1136,8 +1155,8 @@ function csidebars_load_prefixed_functions() {
 	// -----------------
 	// Set Pro Namespace
 	// -----------------
-	if (!function_exists('csidebars_pro_namespace')) {
-	 function csidebars_pro_namespace($pronamespace) {
+	if (!function_exists('PREFIX_pro_namespace')) {
+	 function PREFIX_pro_namespace($pronamespace) {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->pro_namespace($pronamespace);
@@ -1147,8 +1166,8 @@ function csidebars_load_prefixed_functions() {
 	// ---------------
 	// Settings Header
 	// ---------------
-	if (!function_exists('csidebars_settings_header')) {
-	 function csidebars_settings_header() {
+	if (!function_exists('PREFIX_settings_header')) {
+	 function PREFIX_settings_header() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->settings_header();
@@ -1158,8 +1177,8 @@ function csidebars_load_prefixed_functions() {
 	// -------------
 	// Settings Page
 	// -------------
-	if (!function_exists('csidebars_settings_page')) {
-	 function csidebars_settings_page() {
+	if (!function_exists('PREFIX_settings_page')) {
+	 function PREFIX_settings_page() {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->settings_page();
@@ -1169,8 +1188,8 @@ function csidebars_load_prefixed_functions() {
 	// -----------
 	// Message Box
 	// -----------
-	if (!function_exists('csidebars_message_box')) {
-	 function csidebars_message_box($message, $echo=false) {
+	if (!function_exists('PREFIX_message_box')) {
+	 function PREFIX_message_box($message, $echo=false) {
 		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->message_box($message, $echo);
@@ -1185,6 +1204,12 @@ function csidebars_load_prefixed_functions() {
 // =========
 // CHANGELOG
 // =========
+
+// == 1.0.6 ==
+// - added global options filter
+// - added 'emails' option type for multiple email saving
+// - fix for new unchecked checkbox value
+// - fix for typos in URL option type saving
 
 // == 1.0.5 ==
 // - fix for undefined account and support variables
@@ -1216,5 +1241,4 @@ function csidebars_load_prefixed_functions() {
 // - Working Release version
 
 // == 0.9.0 ==
-// - Test Version
-
+// - Development Version
