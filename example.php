@@ -1,10 +1,10 @@
 <?php
 
 /*
-Plugin Name: Plugin Loader Test
-Plugin URI: https://wpmedic.tech/plugin-loader/
+Plugin Name: Plugin Engine Test
+Plugin URI: https://wpmedic.tech/plugin-engine/
 Description: Tester for Plugin Loader Class with Freemius Integration
-Version: 1.0.9
+Version: 1.1.2
 Author: Tony Hayes
 Author URI: https://wpmedic.tech
 */
@@ -265,7 +265,7 @@ $options = array(
 // --------------------
 // Test Plugin Settings
 // --------------------
-$slug = 'loader-test';
+$slug = 'plugin-engine-test';
 $args = array(
 	// --- Plugin Info ---
 	'slug'			=> $slug,
@@ -273,9 +273,9 @@ $args = array(
 	'version'		=> '0.0.1',
 
 	// --- Menus and Links ---
-	'title'			=> 'Plugin Loader Test',
+	'title'			=> 'Plugin Engine Test',
 	// 'parentmenu'		=> 'wordquest',
-	'home'			=> 'https://wpmedic.tech/plugin-loader/',
+	'home'			=> 'https://wpmedic.tech/plugin-engine/',
 	'support'		=> 'https://wordquest.org/solutions/',
 	'ratetext'		=> __('Rate on WordPress.org'),
 	'share'			=> 'https://wpmedic.tech/#share',
@@ -286,15 +286,15 @@ $args = array(
 	// 'settingsmenu'	=> false,
 
 	// --- Options ---
-	'namespace'		=> 'PREFIX',
-	'settings'		=> 'lt',
-	'option'		=> 'loader_test',
+	'namespace'		=> 'ENGINE',
+	'settings'		=> 'pe',
+	'option'		=> 'plugin_engine',
 	'options'		=> $options,
 
 	// --- WordPress.Org ---
-	// 'wporgslug'		=> 'loader-test',
+	// 'wporgslug'		=> 'plugin-engine',
 	'wporg'			=> false,
-	'textdomain'		=> 'loader-test',
+	'textdomain'		=> 'plugin-engine',
 
 	// --- Freemius ---
 	// 'freemius_id'	=> '',
@@ -310,22 +310,22 @@ $args = array(
 $loader = dirname( __FILE__ ) . '/loader.php';
 if ( file_exists( $loader ) ) {
 	require $loader;
-	new NAMESPACE_loader( $args );
+	new ENGINE_loader( $args );
 }
 
 
 // --------------------
 // Output Posted Values
 // --------------------
-add_action( 'NAMESPACE_admin_page_top', 'NAMESPACE_output_posted' );
-function NAMESPACE_output_posted() {
+add_action( 'ENGINE_admin_page_top', 'ENGINE_output_posted' );
+function ENGINE_output_posted() {
 
 	echo "<br><b>Current Settings:</b><br>";
-	var_dump( NAMESPACE_get_settings() );
+	var_dump( ENGINE_get_settings() );
 	echo "<br><br>";
 
 	echo "<br><b>Plugin Options:</b><br>";
-	$instance = $GLOBALS['NAMESPACE_instance'];
+	$instance = $GLOBALS['ENGINE_instance'];
 	var_dump( $instance->options );
 	echo "<br><br>";
 
