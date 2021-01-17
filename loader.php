@@ -12,7 +12,7 @@
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of NAMESPACE_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of radio_station_ in this file with the plugin namespace prefix eg. my_plugin_
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -88,16 +88,16 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new NAMESPACE_loader($args);				// instantiates loader class
-// (ie. search and replace 'NAMESPACE_' with 'my_plugin_' function namespace)
+// $instance = new radio_station_loader($args);				// instantiates loader class
+// (ie. search and replace 'radio_station_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'NAMESPACE_loader' ) ) {
-	class NAMESPACE_loader {
+if ( !class_exists( 'radio_station_loader' ) ) {
+	class radio_station_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -284,7 +284,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 		public function add_settings() {
 
 			// --- add the default plugin settings ---
-			$args = $this->args;
+			$args = $this->args; 
 			$defaults = $this->default_settings();
 			$added = add_option( $args['option'], $defaults );
 
@@ -294,6 +294,10 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 				foreach ( $defaults as $key => $value ) {
 					$GLOBALS[$namespace][$key] = $value;
 				}
+				
+				// --- record first installed version ---
+				// 1.1.0: added record for tracking first install version
+				add_option( $args['option'] . '_first_install', $args['version'] );
 			}
 
 			// 1.0.9: trigger add settings action
@@ -606,13 +610,8 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 						foreach ( $valid as $option => $label ) {
 							$optionkey = $args['settings'] . '_' . $key . '-' . $option;
 							if ( isset( $_POST[$optionkey] ) && ( 'yes' == $_POST[$optionkey] ) ) {
-								if ( isset( $values['value'] ) ) {
-									$posted[$option] = $values['value'];
-								} else {
-									$posted[$option] = 'yes';
-								}
-							} else {
-								$posted[$option] = '';
+								// 1.1.0: fixed to save only array of key values
+								$posted[] = $option;
 							}
 						}
 						$settings[$key] = $posted;
@@ -1223,7 +1222,8 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 				}
 
 				// --- set Freemius settings from plugin settings ---
-				$first_path = add_query_arg( 'page', $args['slug'], admin_url( 'admin.php' ) );
+				// 1.1.1: remove admin_url wrapper on Freemius first-path value
+				$first_path = add_query_arg( 'page', $args['slug'], 'admin.php' );
 				$first_path = add_query_arg( 'welcome', 'true', $first_path );
 				$settings = array(
 					'type'             => $args['type'],
@@ -1345,6 +1345,9 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 					add_options_page( $args['pagetitle'], $args['menutitle'], $args['capability'], $args['slug'], $args['namespace'] . '_settings_page' );
 				}
 			}
+
+			// 1.1.0: add admin notices boxer
+			add_action( 'all_admin_notices', array( $this, 'notice_boxer' ), 999 );
 		}
 
 		// -----------------
@@ -1401,6 +1404,55 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 			return '';
 		}
 
+		// ------------
+		// Notice Boxer
+		// ------------
+		// 1.1.0: added admin notices boxer to settings pages
+		public function notice_boxer() {
+
+			$args = $this->args;
+
+			// --- bug out if not on radio station pages ---
+			if ( !isset( $_REQUEST['page'] ) ) {
+				return;
+			}
+			if ( $args['slug'] != substr( $_REQUEST['page'], 0, strlen( $args['slug'] ) ) ) {
+				return;
+			}
+
+			// --- output notice box ---
+			echo '<div style="width: 98%;" id="admin-notices-box" class="postbox">';
+			echo '<h3 class="admin-notices-title" style="cursor:pointer; margin:7px 14px; font-size:16px;" onclick="settings_toggle_notices();">';
+			echo '<span id="admin-notices-arrow" style="font-size:24px;">&#9656;</span> &nbsp; ';
+			echo '<span id="admin-notices-title" style="vertical-align:top;">' . __( 'Notices' ) . '</span>  &nbsp; ';
+			echo '<span id="admin-notices-count" style="vertical-align:top;"></span></h3>';
+
+			echo '<div id="admin-notices-wrap" style="display:none";><h2 style="display:none;"></h2></div>';
+			echo '</div>';
+
+			// --- toggle notice box script ---
+			echo "<script>function settings_toggle_notices() {
+				if (document.getElementById('admin-notices-wrap').style.display == '') {
+					document.getElementById('admin-notices-wrap').style.display = 'none';
+					document.getElementById('admin-notices-arrow').innerHTML = '&#9656;';
+				} else {
+					document.getElementById('admin-notices-wrap').style.display = '';
+					document.getElementById('admin-notices-arrow').innerHTML= '&#9662;';
+				} 
+			} ";
+			
+			// --- modified from /wp-admin/js/common.js to move notices ---
+			echo "jQuery(document).ready(function() {
+				setTimeout(function() {
+					jQuery('div.update-nag, div.updated, div.error, div.notice').not('.inline, .below-h2').insertAfter(jQuery('#admin-notices-wrap h2'));
+					count = parseInt(jQuery('#admin-notices-wrap').children().length - 1);
+					if (count > 0) {jQuery('#admin-notices-count').html('('+count+')');}
+					else {jQuery('#admin-notices-box').hide();}
+				}, 500);
+			});</script>";
+
+		}
+
 		// ------------------
 		// Plugin Page Header
 		// ------------------
@@ -1435,7 +1487,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 			// 1.0.9: fix to check if PNG file exists
 			$icon_url = false;
 			if ( file_exists( $this->args['dir'] . '/images/' . $args['slug'] . '.gif' ) ) {
-				$icon_url = admin_page_tab_plugins_url( 'images/' . $args['slug'] . '.gif', $args['file'] );
+				$icon_url = plugins_url( 'images/' . $args['slug'] . '.gif', $args['file'] );
 			} elseif ( file_exists( $this->args['dir'] . '/images/' . $args['slug'] . '.png' ) ) {
 				$icon_url = plugins_url( 'images/' . $args['slug'] . '.png', $args['file'] );
 			}
@@ -1454,7 +1506,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 
 			// --- plugin header styles ---
 			echo "<style>.pluginlink {text-decoration:none;} .smalllink {font-size:11px;}
-		.readme:hover {text-decoration:underline;}</style>";
+			.readme:hover {text-decoration:underline;}</style>";
 
 			// --- open header table ---
 			echo "<table><tr>";
@@ -1468,12 +1520,14 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 
 			echo "<td width='20'></td><td>";
 
-			echo "<table><tr><td>";
+			echo "<table><tr>";
 
 			// --- plugin title ---
-			echo "<h3 style='font-size:20px;'><a href='" . esc_url( $args['home'] ) . "' style='text-decoration:none;'>" . esc_html( $args['title'] ) . "</a></h2></a>";
+			echo "<td><h3 style='font-size:20px;'>";
+			echo "<a href='" . esc_url( $args['home'] ) . "' target='_blank' style='text-decoration:none;'>" . esc_html( $args['title'] ) . "</a>";
+			echo "</h3></td>";
 
-			echo "</td><td width='20'></td>";
+			echo "<td width='20'></td>";
 
 			// --- plugin version ---
 			echo "<td><h3>v" . esc_html( $args['version'] ) . "</h3></td></tr>";
@@ -1491,19 +1545,24 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 
 			// --- readme / docs / support links ---
 			// 1.0.8: use filtered links array with automatic separator
+			// 1.1.0: added explicit plugin home link
+			// 1.1.0: added title attributes to links
 			$links = array();
+			if ( isset( $args['home'] ) ) {
+				$links[] = "<a href='" . esc_url( $args['home'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Homepage' ) ) . "' target='_blank'><b>" . esc_html( __( 'Home' ) ) . "</b></a>";
+			}
 			if ( !isset( $args['readme'] ) || ( false !== $args['readme'] ) ) {
 				$readme_url = add_query_arg( 'action', $namespace . '_readme_viewer', admin_url( 'admin-ajax.php' ) );
-				$links[] = "<a href='" . esc_url( $readme_url ) . "' class='pluginlink smalllink thickbox' title='readme.txt'><b>" . esc_html( __( 'Readme' ) ) . "</b></a>";
+				$links[] = "<a href='" . esc_url( $readme_url ) . "' class='pluginlink smalllink thickbox' title='" . esc_attr( __( 'View Plugin' ) ) . " readme.txt'><b>" . esc_html( __( 'Readme' ) ) . "</b></a>";
 			}
 			if ( isset( $args['docs'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['docs'] ) . "' class='pluginlink smalllink' target='_blank'><b>" . esc_html( __( 'Docs' ) ) . "</b></a>";
+				$links[] = "<a href='" . esc_url( $args['docs'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Documentation' ) ) . "' target='_blank'><b>" . esc_html( __( 'Docs' ) ) . "</b></a>";
 			}
 			if ( isset( $args['support'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['support'] ) . "' class='pluginlink smalllink' target='_blank'><b>" . esc_html( __( 'Support' ) ) . "</b></a>";
+				$links[] = "<a href='" . esc_url( $args['support'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Support' ) ) . "' target='_blank'><b>" . esc_html( __( 'Support' ) ) . "</b></a>";
 			}
 			if ( isset( $args['development'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['development'] ) . "' class='pluginlink smalllink' target='_blank'><b>" . esc_html( __( 'Dev' ) ) . "</b></a>";
+				$links[] = "<a href='" . esc_url( $args['development'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Development' ) ) . "' target='_blank'><b>" . esc_html( __( 'Dev' ) ) . "</b></a>";
 			}
 
 			// 1.0.9: change filter from _plugin_links to disambiguate
@@ -1708,7 +1767,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 
 				// --- output tab switcher script ---
 				// 1.0.9: add to settings scripts
-				$script = "function show_settings_tab(tab) {" . PHP_EOL;
+				$script = "function settings_display_tab(tab) {" . PHP_EOL;
 				foreach ( $tabs as $tab => $label ) {
 					$script .= "	document.getElementById('" . esc_js( $tab ) . "-tab-button').className = 'settings-tab-button inactive';" . PHP_EOL;
 					$script .= "	document.getElementById('" . esc_js( $tab ) . "-tab').className = 'settings-tab inactive'; " . PHP_EOL;
@@ -1727,7 +1786,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 						$class = 'active';
 					}
 					echo "<li id='" . esc_attr( $tab ) . "-tab-button' class='settings-tab-button " . esc_attr( $class ) . "' onclick='";
-					echo 'show_settings_tab("' . esc_attr( $tab ) . '");';
+					echo 'settings_display_tab("' . esc_attr( $tab ) . '");';
 					echo "'>" . esc_html( $tablabel ) . "</li>";
 					$i ++;
 				}
@@ -1739,7 +1798,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 			// --- reset to default script ---
 			// 1.0.9: add to settings scripts
 			$confirmreset = __( 'Are you sure you want to reset to default settings?' );
-			$script = "function resettodefaults() {
+			$script = "function settings_reset_defaults() {
 			agree = confirm('" . esc_js( $confirmreset ) . "'); if (!agree) {return false;}
 			document.getElementById('settings-action').value = 'reset';
 			document.getElementById('settings-form').submit();
@@ -1840,7 +1899,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 				// (filtered so removable from any specific tab)
 				$buttons = "<tr height='25'><td> </td></tr>";
 				$buttons .= "<tr><td align='center'>";
-				$buttons .= "<input type='button' class='button-secondary settings-button' onclick='return resettodefaults();' value='" . esc_attr( __( 'Reset Settings' ) ) . "'>";
+				$buttons .= "<input type='button' class='button-secondary settings-button' onclick='return settings_reset_defaults();' value='" . esc_attr( __( 'Reset Settings' ) ) . "'>";
 				$buttons .= "</td><td colspan='3'></td><td align='center'>";
 				$buttons .= "<input type='submit' class='button-primary settings-button' value='" . esc_attr( __( 'Save Settings' ) ) . "'>";
 				$buttons .= "</td></tr>";
@@ -1871,7 +1930,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 
 			// --- number input step script ---
 			// 1.0.9: added to script array
-			$script = "function number_step(updown, id, min, max, step) {
+			$script = "function settings_number_step(updown, id, min, max, step) {
 			if (updown == 'up') {multiplier = 1;}
 			if (updown == 'down') {multiplier = -1;}
 			current = parseInt(document.getElementById(id).value);
@@ -2112,10 +2171,9 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 
 						// --- toggle ---
 						// 1.0.9: add toggle input (styled checkbox)
+						$checked = '';
 						if ( $setting == $option['value'] ) {
-							$checked = ' checked';
-						} else {
-							$checked = '';
+							$checked = " checked='checked'";
 						}
 						$row .= "<label for='" . esc_attr( $name ) . "' class='setting-toggle'>";
 						$row .= "<input type='checkbox' name='" . esc_attr( $name ) . "' class='setting-toggle' value='" . esc_attr( $option['value'] ) . "'" . $checked . ">";
@@ -2128,10 +2186,9 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 					} elseif ( 'checkbox' == $type ) {
 
 						// --- checkbox ---
+						$checked = '';
 						if ( $setting == $option['value'] ) {
-							$checked = ' checked';
-						} else {
-							$checked = '';
+							$checked = " checked='checked'";
 						}
 						$row .= "<input type='checkbox' name='" . $name . "' class='setting-checkbox' value='" . esc_attr( $option['value'] ) . "'" . $checked . ">";
 						if ( isset( $option['suffix'] ) ) {
@@ -2143,10 +2200,9 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 						// --- multicheck boxes ---
 						$checkboxes = array();
 						foreach ( $option['options'] as $key => $label ) {
+							$checked = '';
 							if ( is_array( $setting ) && in_array( $key, $setting ) ) {
-								$checked = ' checked';
-							} else {
-								$checked = '';
+								$checked = " checked='checked'";
 							}
 							$checkboxes[] = "<input type='checkbox' name='" . esc_attr( $name ) . "-" . esc_attr( $key ) . "' class='setting-checkbox' value='yes'" . $checked . "> " . esc_html( $label );
 						}
@@ -2157,10 +2213,9 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 						// --- radio buttons ---
 						$radios = array();
 						foreach ( $option['options'] as $value => $label ) {
+							$checked = '';
 							if ( $setting === $value ) {
-								$checked = " checked";
-							} else {
-								$checked = '';
+								$checked = " checked='checked'";
 							}
 							$radios[] = "<input type='radio' class='setting-radio' name='" . esc_attr( $name ) . "' value='" . esc_attr( $value ) . "'" . $checked . "> " . esc_html( $label );
 						}
@@ -2269,8 +2324,8 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 						} else {
 							$step = 1;
 						}
-						$onclickup = 'number_step("up", "' . esc_attr( $name ) . '", ' . esc_attr( $min ) . ', ' . esc_attr( $max ) . ', ' . esc_attr( $step ) . ');';
-						$onclickdown = 'number_step("down", "' . esc_attr( $name ) . '", ' . esc_attr( $min ) . ', ' . esc_attr( $max ) . ', ' . esc_attr( $step ) . ');';
+						$onclickup = 'settings_number_step("up", "' . esc_attr( $name ) . '", ' . esc_attr( $min ) . ', ' . esc_attr( $max ) . ', ' . esc_attr( $step ) . ');';
+						$onclickdown = 'settings_number_step("down", "' . esc_attr( $name ) . '", ' . esc_attr( $min ) . ', ' . esc_attr( $max ) . ', ' . esc_attr( $step ) . ');';
 						$row .= "<input class='setting-button button-secondary' type='button' value='-' onclick='" . esc_js( $onclickdown ) . "'>";
 						$row .= "<input class='setting-numeric' type='text' name='" . esc_attr( $name ) . "' id='" . esc_attr( $name ) . "' value='" . esc_attr( $setting ) . "' placeholder='" . esc_attr( $placeholder ) . "'>";
 						$row .= "<input class='setting-button button-secondary' type='button' value='+' onclick='" . esc_js( $onclickup ) . "'>";
@@ -2329,6 +2384,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 			$styles[] = '#wrapbox {margin-right: 20px;}';
 
 			// --- settings tab styles ---
+			// 1.1.0: added max-width:100% to select input
 			$styles[] = '.settings-tab-button {display:inline-block; font-size:15px; padding:7px 14px; margin-right:20px; border-radius:7px;}';
 			$styles[] = '.settings-tab-button.active {font-weight:bold; background-color:#0073aa; color:#FFF; border:1px solid #FFF;}';
 			$styles[] = '.settings-tab-button.inactive {font-weight:bold; background-color:#F5F5F5; color:#0073aa; border:1px solid #000;}';
@@ -2350,7 +2406,7 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 			$styles[] = '.settings-input input.setting-numeric {display:inline-block; width:50%; text-align:center;}';
 			$styles[] = '.settings-input input.setting-button {display:inline-block; padding:0px 5px;}';
 			$styles[] = '.settings-input input.setting-textarea {width:100%;}';
-			$styles[] = '.settings-input select.setting-select {min-width:100px;}';
+			$styles[] = '.settings-input select.setting-select {min-width:100px; max-width:100%;}';
 
 			// --- toggle input styles ---
 			// Ref: https://www.w3schools.com/howto/howto_css_switch.asp
@@ -2395,10 +2451,10 @@ if ( !class_exists( 'NAMESPACE_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'NAMESPACE_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'radio_station_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
-	function NAMESPACE_load_prefixed_functions() {
+if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
+	function radio_station_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -2407,8 +2463,8 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'NAMESPACE_get_namespace_slug' ) ) {
-			function NAMESPACE_get_namespace_slug( $f ) {
+		if ( !function_exists( 'radio_station_get_radio_station_slug' ) ) {
+			function radio_station_get_radio_station_slug( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -2417,9 +2473,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'NAMESPACE_loader_instance' ) ) {
-			function NAMESPACE_loader_instance() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_loader_instance' ) ) {
+			function radio_station_loader_instance() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
@@ -2429,9 +2485,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'NAMESPACE_freemius_instance' ) ) {
-			function NAMESPACE_freemius_instance() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_freemius_instance' ) ) {
+			function radio_station_freemius_instance() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -2441,9 +2497,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// Get Plugin Data
 		// ---------------
 		// 2.3.0: added function for getting plugin data
-		if ( !function_exists( 'NAMESPACE_plugin_data' ) ) {
-			function NAMESPACE_plugin_data() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_plugin_data' ) ) {
+			function radio_station_plugin_data() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
@@ -2453,9 +2509,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'NAMESPACE_add_settings' ) ) {
-			function NAMESPACE_add_settings() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_add_settings' ) ) {
+			function radio_station_add_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -2464,9 +2520,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'NAMESPACE_default_settings' ) ) {
-			function NAMESPACE_default_settings( $key = false ) {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_default_settings' ) ) {
+			function radio_station_default_settings( $key = false ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -2476,9 +2532,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'NAMESPACE_get_options' ) ) {
-			function NAMESPACE_get_options() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_options' ) ) {
+			function radio_station_get_options() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -2488,9 +2544,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'NAMESPACE_get_setting' ) ) {
-			function NAMESPACE_get_setting( $key, $filter = true ) {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_setting' ) ) {
+			function radio_station_get_setting( $key, $filter = true ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -2501,9 +2557,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'NAMESPACE_get_settings' ) ) {
-			function NAMESPACE_get_settings( $filter = true ) {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_settings' ) ) {
+			function radio_station_get_settings( $filter = true ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -2513,9 +2569,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'NAMESPACE_reset_settings' ) ) {
-			function NAMESPACE_reset_settings() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_reset_settings' ) ) {
+			function radio_station_reset_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -2524,9 +2580,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'NAMESPACE_update_settings' ) ) {
-			function NAMESPACE_update_settings() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_update_settings' ) ) {
+			function radio_station_update_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -2535,9 +2591,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'NAMESPACE_delete_settings' ) ) {
-			function NAMESPACE_delete_settings() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_delete_settings' ) ) {
+			function radio_station_delete_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
@@ -2546,9 +2602,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// -----------------
 		// Set Pro Namespace
 		// -----------------
-		if ( !function_exists( 'NAMESPACE_pro_namespace' ) ) {
-			function NAMESPACE_pro_namespace( $pronamespace ) {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_pro_namespace' ) ) {
+			function radio_station_pro_namespace( $pronamespace ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->pro_namespace( $pronamespace );
 			}
@@ -2557,9 +2613,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'NAMESPACE_message_box' ) ) {
-			function NAMESPACE_message_box( $message, $echo = false ) {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_message_box' ) ) {
+			function radio_station_message_box( $message, $echo = false ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -2569,9 +2625,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'NAMESPACE_settings_header' ) ) {
-			function NAMESPACE_settings_header() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_header' ) ) {
+			function radio_station_settings_header() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -2580,9 +2636,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'NAMESPACE_settings_page' ) ) {
-			function NAMESPACE_settings_page() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_page' ) ) {
+			function radio_station_settings_page() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -2592,9 +2648,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'NAMESPACE_settings_table' ) ) {
-			function NAMESPACE_settings_table() {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_table' ) ) {
+			function radio_station_settings_table() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -2604,9 +2660,9 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'NAMESPACE_settings_row' ) ) {
-			function NAMESPACE_settings_row( $option, $setting ) {
-				$namespace = NAMESPACE_get_namespace_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_row' ) ) {
+			function radio_station_settings_row( $option, $setting ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -2622,6 +2678,15 @@ if ( !function_exists( 'NAMESPACE_load_prefixed_functions' ) ) {
 // =========
 // CHANGELOG
 // =========
+
+// == 1.1.1 ==
+// - remove admin_url wrapper on Freemius first-path value
+
+// == 1.1.0 ==
+// - fix to saving multicheck as single array of values
+// - added admin notices boxer to settings pages
+// - added record for tracking first install version
+// - added explicit home link to plugin page links
 
 // == 1.0.9 ==
 // - added automated Settings table and Admin Page output
