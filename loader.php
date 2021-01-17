@@ -5,7 +5,7 @@
 // =====================================
 //
 // --------------
-// Version: 1.0.7
+// Version: 1.0.8
 // --------------
 // * changelog at end of file! *
 //
@@ -42,8 +42,8 @@
 // $args = array(
 //	// --- Plugin Info ---
 //	'slug'			=> $slug,			// (uses slug above)
-//	'file'			=> __FILE__,		// path to main plugin file (important!)
-//	'version'		=> '0.0.1', 		// * rechecked later (from plugin header) *
+//	'file'			=> __FILE__,		// path to main plugin file (required!)
+//	'version'		=> '0.0.1', 		// * rechecked later (pulled from plugin header) *
 //
 //	// --- Menus and Links ---
 //	'title'			=> 'Plugin Name',	// plugin title
@@ -55,10 +55,12 @@
 //	'sharetext'		=> __('Share the Plugin Love'),		// (overrides default sharing text)
 //	'donate'		=> 'https://patreon.com/pagename',	// (overrides plugin Donate URI)
 //	'donatetext'	=> __('Support this Plugin'),		// (overrides default donate text)
+//	'readme'		=> false,			// to not link to popup readme in settings page header
+//	'settingsmenu'	=> false,			// to not automatically add a settings menu [non-WQ]
 //
 //	// --- Options ---
 //	'namespace'		=> 'plugin_name',	// plugin namespace (function prefix)
-//	'settings'		=> 'pn',			// sidebar settings prefix
+//	'settings'		=> 'pn',			// sidebar settings prefix [WQ]
 //	'option'		=> 'plugin_key',	// plugin option key
 //	'options'		=> $options,		// plugin options array set above
 //
@@ -78,9 +80,10 @@
 // ----------------------------
 // Start Plugin Loader Instance
 // ----------------------------
+// (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
 // $instance = new PREFIX_loader($args);					// instantiates loader class
-// (ie. search and replace 'PREFIX_' with 'my_plugin_')
+// (ie. search and replace 'PREFIX_' with 'my_plugin_' function namespace)
 
 
 // ===========================
@@ -106,7 +109,8 @@ class PREFIX_loader {
 		$this->options = $args['options']; unset($args['options']);
 
 		// --- set plugin args and namespace ---
-		$this->args = $args; $this->namespace = $args['namespace'];
+		$this->args = $args;
+		$this->namespace = $args['namespace'];
 
 		// --- setup plugin values ---
 		$this->setup_plugin();
@@ -153,6 +157,11 @@ class PREFIX_loader {
 		// --- Author URL ---
 		if (!isset($args['author_url'])) {$args['author_url'] = $this->plugin_data('Author URI:');}
 
+		// --- WordQuest plugin flag ---
+		// 1.0.8: check for WordQuest helper file
+		$wordquest = $dir.'/wordquest.php';
+		if (file_exists($wordquest)) {$args['wordquest'] = true;} else {$args['wordquest'] = false;}
+
 		// --- Pro Functions ---
 		if (!isset($args['proslug'])) {
 			$proslug = $this->plugin_data('@fs_premium_only');
@@ -163,7 +172,7 @@ class PREFIX_loader {
 			$args['profiles'] = $profiles;
 		}
 
-		// --- update the loader args ---
+		// --- Update Loader Args ---
 		$this->args = $args;
 	}
 
@@ -225,8 +234,8 @@ class PREFIX_loader {
 			foreach ($defaults as $key => $value) {$GLOBALS[$namespace][$key] = $value;}
 		}
 
-		// --- add sidebar settings ---
-		if (isset($args['settings'])) {
+		// --- add WordQuest sidebar settings ---
+		if ($args['wordquest'] && isset($args['settings'])) {
 			if (file_exists($args['dir'].'/updatechecker.php')) {$adsboxoff = '';} else {$adsboxoff = 'checked';}
 			$sidebaroptions = array('adsboxoff' => $adsboxoff, 'donationboxoff' => '', 'reportboxoff' => '', 'installdate' => date('Y-m-d'));
 			add_option($args['settings'].'_sidebar_options', $sidebaroptions);
@@ -238,18 +247,25 @@ class PREFIX_loader {
 	// -----------------------
 	function maybe_transfer_settings() {
 		$namespace = $this->namespace; $funcname = $namespace.'_transfer_settings';
+
 		// --- check for either function prefixed or class extended method ---
 		if (method_exists($this, 'transfer_settings')) {$this->transfer_settings();}
 		elseif (function_exists($funcname)) {call_user_func($funcname);}
 	}
 
-	// ----------------
-	// Get All Settings
-	// ----------------
-	function get_settings() {
+	// -----------------------
+	// Get All Plugin Settings
+	// -----------------------
+	function get_settings($filter=true) {
 		$namespace = $this->namespace;
 		$settings = $GLOBALS[$namespace];
 		$settings = apply_filters($namespace.'_settings', $settings);
+		// 1.0.8: maybe apply all individual key value filters
+		if ($filter) {
+			foreach ($settings as $key => $value) {
+				$settings[$key] = apply_filters($namespace.'_'.$key, $value);
+			}
+		}
 		return $settings;
 	}
 
@@ -467,6 +483,16 @@ class PREFIX_loader {
 					$valuestring = implode(',', $values);
 					$settings[$key] = $valuestring;
 
+				} elseif ($type == 'pageid') {
+
+					// --- page ID ---
+					// 1.0.8: added page ID type
+					if ($posted != '') {
+						$posted = (int)$posted;
+						$post = get_post($posted);
+						if ($post) {$settings[$key] = $posted;}
+					}
+
 				}
 
 			}
@@ -522,8 +548,8 @@ class PREFIX_loader {
 	// ---------------
 	function delete_settings() {
 		// TODO: check for settings delete settings switch ?
-		// $args = $this->args;
-		// delete_option($args['option']);
+		$args = $this->args;
+		delete_option($args['option']);
 	}
 
 
@@ -566,7 +592,7 @@ class PREFIX_loader {
 		add_filter('plugin_action_links', array($this, 'settings_link'), 10, 2);
 
 		// --- delete settings on deactivation ---
-		// TODO: check for setting to delete settings
+		// TODO: check for flag to delete settings data
 		// register_deactivation_hook($args['file'], array($this, 'delete_settings'));
 
 		// --- maybe load thickbox ---
@@ -611,11 +637,11 @@ class PREFIX_loader {
 		$args['wporg'] = $wporg; $this->args = $args;
 
 		// --- WordQuest Admin ---
-		if (version_compare(PHP_VERSION, '5.3.0') >= 0) {
+		// 1.0.8: check WordQuest plugin flag
+		if ($args['wordquest']) && is_admin() && (version_compare(PHP_VERSION, '5.3.0') >= 0)) {
+			include($dir.'/wordquest.php');
 			global $wordquestplugins; $slug = $args['slug'];
 			foreach ($args as $key => $value) {$wordquestplugins[$slug][$key] = $value;}
-			$wordquest = $dir.'/wordquest.php';
-			if (file_exists($wordquest) && is_admin()) {include($wordquest);}
 		}
 
 		// --- Freemius ---
@@ -746,7 +772,8 @@ class PREFIX_loader {
 			// --- start the Freemius SDK ---
 			if (!class_exists('Freemius')) {
 				$freemiuspath = dirname(__FILE__).'/freemius/start.php';
-				if (file_exists($freemiuspath)) {require_once($freemiuspath);} else {return;}
+				if (!file_exists($freemiuspath)) {return;}
+				require_once($freemiuspath);
 			}
 
 			// --- set defaults for optional key values ---
@@ -848,14 +875,14 @@ class PREFIX_loader {
 	function settings_menu() {
 		$args = $this->args; $namespace = $this->namespace; $settings = $GLOBALS[$namespace];
 
-		// --- filter
-
+		// --- filter capability ---
 		$args['capability'] = apply_filters($args['namespace'].'_manage_options_capability', 'manage_options');
 		if (!isset($args['pagetitle'])) {$args['pagetitle'] = $args['title'];}
 		if (!isset($args['menutitle'])) {$args['menutitle'] = $args['title'];}
 
-		// --- check for WordQuest admin page function ---
-		if (function_exists('wqhelper_admin_page')) {
+		// --- check if WordQuest plugin ---
+		// 1.0.8: change from function exists check
+		if ($args['wordquest'])) {
 
 			// --- filter menu capability early ---
 			$capability = apply_filters('wordquest_menu_capability', 'manage_options');
@@ -880,9 +907,12 @@ class PREFIX_loader {
 			}
 		}
 
-		// --- add standalone options page if WordQuest Admin not loaded ---
+		// --- maybe auto-add standalone options page ---
 		if (!isset($menuadded) || !$menuadded) {
-			add_options_page($args['pagetitle'], $args['menutitle'], $args['capability'], $args['slug'], $args['namespace'].'_settings_page');
+			// 1.0.8: check settingsmenu switch
+			if (!isset($args['settingsmenu']) || ($args['settingsmenu'] !== false)) {
+				add_options_page($args['pagetitle'], $args['menutitle'], $args['capability'], $args['slug'], $args['namespace'].'_settings_page');
+			}
 		}
 	}
 
@@ -962,23 +992,37 @@ class PREFIX_loader {
 
 			echo "<tr><td colspan='3' align='center'>";
 
-				// ---- plugin author ---
 				echo "<table><tr><td align='center'>";
 
-					echo "<font style='font-size:16px;'>".__('by')."</font> ";
-					echo "<a href='".$args['author_url']."' target=_blank style='text-decoration:none;font-size:16px;' target=_blank><b>".$args['author']."</b></a><br><br>";
+					// ---- plugin author ---
+					// 1.0.8: check if author URL is set
+					if (isset($args['author_url'])) {
+						echo "<font style='font-size:16px;'>".__('by')."</font> ";
+						echo "<a href='".$args['author_url']."' target=_blank style='text-decoration:none;font-size:16px;' target=_blank><b>".$args['author']."</b></a><br><br>";
+					}
 
 					// --- readme / docs / support links ---
-					$readme_url = add_query_arg('action', $namespace.'_readme_viewer', admin_url('admin-ajax.php'));
-					echo "<a href='".$readme_url."' class='pluginlink smalllink thickbox' title='readme.txt'><b>".__('Readme')."</b></a>";
-					if (isset($args['docs'])) {echo " | <a href='".$args['docs']."' class='pluginlink smalllink' target=_blank><b>".__('Docs')."</b></a>";}
-					if (isset($args['support'])) {echo " | <a href='".$args['support']."' class='pluginlink smalllink' target=_blank><b>".__('Support')."</b></a>";}
+					// 1.0.8: use filtered links array with automatic separator
+					$links = array();
+					if (!isset($args['readme']) || ($args['readme'] !== false)) {
+						$readme_url = add_query_arg('action', $namespace.'_readme_viewer', admin_url('admin-ajax.php'));
+						$links[] = "<a href='".$readme_url."' class='pluginlink smalllink thickbox' title='readme.txt'><b>".__('Readme')."</b></a>";
+					}
+					if (isset($args['docs'])) {$links[] = "<a href='".$args['docs']."' class='pluginlink smalllink' target=_blank><b>".__('Docs')."</b></a>";}
+					if (isset($args['support'])) {$links[] = "<a href='".$args['support']."' class='pluginlink smalllink' target=_blank><b>".__('Support')."</b></a>";}
 
-				echo "</td><td>";
+					$links = apply_filters($args['namespace'].'_plugin_links', $links);
+					if (count($links) > 0) {echo implode(' | ', $links);}
 
 					// --- author icon ---
 					if ($author_icon_url) {
-						echo "<a href='".$args['author_url']."' target=_blank><img src='".$author_icon_url."' width='64' height='64' border='0'>";
+						echo "</td><td>";
+						$author_image = "<img src='".$author_icon_url."' width='64' height='64' border='0'>";
+						// 1.0.8: check if author URL is set for link
+						if (isset($args['author_url'])) {
+							$author_image = "<a href='".$args['author_url']."' target=_blank>".$author_image."</a>";
+						}
+						echo $author_image;
 					}
 
 				echo "</td></tr></table>";
@@ -988,10 +1032,11 @@ class PREFIX_loader {
 		echo "</td><td width='50'></td><td style='vertical-align:top;'>";
 
 			// --- plugin supporter links ---
-			// 1.0.1: set rate/share/supporter links and texts
+			// 1.0.1: set rate/share/donate links and texts
+			// 1.0.8: added filters for rate/share/donate links
 			echo "<br>";
 
-			// --- rate link ---
+			// --- Rate link ---
 			if (isset($args['wporgslug'])) {
 				if (isset($args['rate'])) {$rate_url = $args['rate'];}
 				elseif (isset($args['type']) && ($args['type'] == 'theme')) {
@@ -999,31 +1044,37 @@ class PREFIX_loader {
 				} else {$rate_url = 'https://wordpress.org/plugins/'.$args['wporgslug'].'/reviews/#new-post';}
 				if (isset($args['ratetext'])) {$rate_text = $args['ratetext'];}
 				else {$rate_text = __('Rate on WordPress.Org');}
-				echo "<a href='".$rate_url."' class='pluginlink' target='_blank'>";
-				echo "<span style='font-size:24px; color:#FC5; margin-right:10px;' class='dashicons dashicons-star-filled'></span> ";
-				echo $rate_text."</a><br><br>";
+				$rate_link = "<a href='".$rate_url."' class='pluginlink' target='_blank'>";
+				$rate_link .= "<span style='font-size:24px; color:#FC5; margin-right:10px;' class='dashicons dashicons-star-filled'></span> ";
+				$rate_link .= $rate_text."</a><br><br>";
+				$rate_link = apply_filters($args['namespace'].'_rate_link', $rate_link);
+				echo $rate_link;
 			}
 
-			// --- share link ---
+			// --- Share link ---
 			if (isset($args['share'])) {
 				if (isset($args['sharetext'])) {$share_text = $args['sharetext'];}
 				else {$share_text = __('Share the Plugin Love');}
-				echo "<a href='".$args['share']."' class='pluginlink' target='_blank'>";
-				echo "<span style='font-size:24px; color:#E0E; margin-right:10px;' class='dashicons dashicons-share'></span> ";
-				echo $share_text."</a><br><br>";
+				$share_link = "<a href='".$args['share']."' class='pluginlink' target='_blank'>";
+				$share_link .= "<span style='font-size:24px; color:#E0E; margin-right:10px;' class='dashicons dashicons-share'></span> ";
+				$share_link .= $share_text."</a><br><br>";
+				$share_link = apply_filters($args['namespace'].'_share_link', $share_link);
+				echo $share_link;
 			}
 
-			// --- donate link ---
+			// --- Donate link ---
 			if (isset($args['donate'])) {
 				if (isset($args['donatetext'])) {$donate_text = $args['donatetext'];}
 				else {$donate_text = __('Support this Plugin');}
-				echo "<a href='".$args['donate']."' class='pluginlink' target='_blank'>";
-				echo "<span style='font-size:24px; color:#E00; margin-right:10px;' class='dashicons dashicons-heart'></span> ";
-				echo "<b>".$donate_text."</b></a><br><br>";
+				$donate_link = "<a href='".$args['donate']."' class='pluginlink' target='_blank'>";
+				$donate_link .= "<span style='font-size:24px; color:#E00; margin-right:10px;' class='dashicons dashicons-heart'></span> ";
+				$donate_link .= "<b>".$donate_text."</b></a><br><br>";
+				$donate_link = apply_filters($args['namespace'].'_donate_link', $donate_link);
+				echo $donate_link;
 			}
 		echo "</td></tr>";
 
-		// --- updated and reset messages ---
+		// --- output updated and reset messages ---
 		if (isset($_GET['updated'])) {
 			if ($_GET['updated'] == 'yes') {$message = $settings['title'].' '.__('Settings Updated.');}
 			elseif ($_GET['updated'] == 'no') {$message = __('Error! Settings NOT Updated.');}
@@ -1208,6 +1259,12 @@ function PREFIX_load_prefixed_functions() {
 // =========
 // CHANGELOG
 // =========
+
+// == 1.0.8 ==
+// - added WordQuest plugin flag (for use by non-WQ plugins)
+// - apply settings key filters when getting all settings
+// - added filters for rate/share/donate links
+// - added page ID to settings types
 
 // == 1.0.7 ==
 // - fix support URL undefined variable warning
