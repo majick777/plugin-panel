@@ -5,14 +5,14 @@
 // ===========================
 //
 // --------------
-// Version: 1.1.2
+// Version: 1.1.3
 // --------------
-// * changelog at end of file! *
+// Note: Changelog and structure at end of file.
 //
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of ENGINE_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of PREFIX_ in this file with the plugin namespace prefix eg. my_plugin_
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -88,16 +88,16 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new ENGINE_loader($args);				// instantiates loader class
-// (ie. search and replace 'ENGINE_' with 'my_plugin_' function namespace)
+// $instance = new PREFIX_loader($args);				// instantiates loader class
+// (ie. search and replace 'PREFIX_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'ENGINE_loader' ) ) {
-	class ENGINE_loader {
+if ( !class_exists( 'PREFIX_loader' ) ) {
+	class PREFIX_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -110,13 +110,27 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 		public $sections = array();
 		public $scripts = array();
 
-		// 1.1.0: added menu added switch
+		// 1.1.2: added menu added switch
+		// 1.1.2: added debug switch
 		public $menu_added = false;
+		public $debug = false;
 		
 		// -----------------
 		// Initialize Loader
 		// -----------------
 		public function __construct( $args ) {
+
+			// --- set debug switch ---
+			// 1.1.2: added debug switch check
+			$prefix = ''; 
+			if ( $args['settings'] ) {
+				$prefix = '-' . $args['settings'];
+			}
+			if ( isset( $_REQUEST[$prefix . 'debug'] ) ) {
+				if ( ( '1' == $_REQUEST[$prefix . 'debug'] ) || ( 'yes' == $_REQUEST[$prefix . 'debug'] ) ) {
+					$this->debug = true;
+				}
+			}
 
 			// --- set plugin options ---
 			// 1.0.6: added options filter
@@ -232,6 +246,15 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 
 			return $value;
 		}
+		
+		// ------------------
+		// Get Plugin Version
+		// ------------------
+		// 1.1.2: added get plugin version function
+		public function plugin_version() {
+			$args = $this->args;
+			return $args['version'];
+		}
 
 		// -----------------
 		// Set Pro Namespace
@@ -261,7 +284,10 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			}
 
 			// --- filter and store the plugin default settings ---
+			// 1.1.2: fix to apply options filter
+			$namespace = $this->namespace;
 			$options = $this->options;
+			$options = apply_filters( $namespace . '_options', $options );			
 			$defaults = array();
 			foreach ( $options as $key => $values ) {
 				// 1.0.9: set default to null if default value not set
@@ -271,7 +297,6 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 					$defaults[$key] = null;
 				}
 			}
-			$namespace = $this->namespace;
 			$defaults = apply_filters( $namespace . '_default_settings', $defaults );
 			$this->defaults = $defaults;
 			if ( $dkey && isset( $defaults[$dkey] ) ) {
@@ -461,7 +486,7 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			// --- get plugin options and default settings ---
 			// 1.0.9: allow filtering of plugin options (eg. for Pro/Add Ons)
 			$options = $this->options;
-			$options = apply_filters( $namespace . '_plugin_options', $options );
+			$options = apply_filters( $namespace . '_options', $options );
 			$defaults = $this->default_settings();
 
 			// --- maybe use custom method or function ---
@@ -542,7 +567,7 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 						}
 					}
 
-					if ( isset( $_REQUEST['debug'] ) && ( 'yes' == $_REQUEST['debug'] ) ) {
+					if ( $this->debug ) {
 						echo 'Saving Setting Key ' . $key . ' (' . $postkey . ': ' . print_r( $posted, true ) . '<br>';
 						echo 'Type: ' . $type . ' - Valid Options ' . $key . ': ' . print_r( $valid, true ) . '<br>';
 					}
@@ -612,9 +637,13 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 						$posted = array();
 						foreach ( $valid as $option => $label ) {
 							$optionkey = $args['settings'] . '_' . $key . '-' . $option;
-							if ( isset( $_POST[$optionkey] ) && ( 'yes' == $_POST[$optionkey] ) ) {
-								// 1.1.0: fixed to save only array of key values
-								$posted[] = $option;
+							if ( isset( $_POST[$optionkey] ) ) {
+								// 1.1.2: check for value if specified
+								if ( ( isset( $values['value'] ) && ( $values['value'] == $_POST[$optionkey] ) ) 
+								  || ( !isset( $values['value'] ) && ( 'yes' == $_POST[$optionkey] ) ) ) {
+									// 1.1.0: fixed to save only array of key values
+									$posted[] = $option;
+								}
 							}
 						}
 						$settings[$key] = $posted;
@@ -662,7 +691,7 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 
 					}
 
-					if ( isset( $_REQUEST['debug'] ) && ( 'yes' == $_REQUEST['debug'] ) ) {
+					if ( $this->debug ) {
 						echo 'New Settings for Key ' . $key . ': ';
 						if ( $newsettings ) {
 							echo '(to-validate) ' . print_r( $newsettings, true ) . '<br>';
@@ -697,7 +726,7 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 							}
 						}
 
-						if ( isset( $_REQUEST['debug'] ) && ( 'yes' == $_REQUEST['debug'] ) ) {
+						if ( $this->debug ) {
 							echo 'Valid Options for Key ' . $key . ': ' . print_r( $valid, true ) . '<br>';
 							echo 'Validated Settings for Key ' . $key . ': ' . print_r( $settings[$key], true ) . '<br>';
 						}
@@ -904,22 +933,25 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 		// Delete Settings
 		// ---------------
 		public function delete_settings() {
-			// TODO: check for plugin settings flag to delete settings data?
+		
+			// TODO: check for plugin settings flag to delete settings ?
 			// $delete_settings = $this->get_setting( 'delete_settings' );
 			// if ( $delete_settings ) {
 			//	$args = $this->args;
 			//	delete_option( $args['option'] );
 			// }
+			
+			// TODO: check for plugin settings flag to delete data?
 			// $delete_data = $this->get_setting( 'delete_data' );
 			// if ( $delete_data ) {
-			//	do_action( $this->namespace.'_delete_data' );
+			//	do_action( $this->namespace . '_delete_data' );
 			// }
 		}
 
 
-		// ===============
-		// --- Loading ---
-		// ===============
+		// ======================
+		// --- Plugin Loading ---
+		// ======================
 
 		// --------------------
 		// Load Plugin Settings
@@ -1045,9 +1077,9 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			}
 		}
 
-		// -------------
-		// Readme Viewer
-		// -------------
+		// ------------------
+		// Readme Viewer AJAX
+		// ------------------
 		public function readme_viewer() {
 
 			$args = $this->args;
@@ -1312,9 +1344,9 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 		}
 
 
-		// =============
-		// --- Admin ---
-		// =============
+		// ====================
+		// --- Plugin Admin ---
+		// ====================
 
 		// -----------------
 		// Add Settings Menu
@@ -1472,22 +1504,19 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			$settings = $GLOBALS[$namespace];
 
 			// --- output debug values ---
-			if ( isset( $_REQUEST['debug'] ) ) {
-				if ( ( 'yes' == $_REQUEST['debug'] ) || ( '1' == $_REQUEST['debug'] ) ) {
+			if ( $this->debug ) {
+				echo "<br><b>Current Settings:</b><br>";
+				print_r( $settings );
+				echo "<br><br>";
 
-					echo "<br><b>Current Settings:</b><br>";
-					print_r( $settings );
-					echo "<br><br>";
+				echo "<br><b>Plugin Options:</b><br>";
+				print_r( $this->options );
+				echo "<br><br>";
 
-					echo "<br><b>Plugin Options:</b><br>";
-					print_r( $this->options );
-					echo "<br><br>";
-
-					if ( isset( $_POST ) ) {
-						echo "<br><b>Posted Values:</b><br>";
-						foreach ( $_POST as $key => $value ) {
-							echo esc_attr( $key ) . ': ' . print_r( $value, true ) . '<br>';
-						}
+				if ( isset( $_POST ) ) {
+					echo "<br><b>Posted Values:</b><br>";
+					foreach ( $_POST as $key => $value ) {
+						echo esc_attr( $key ) . ': ' . print_r( $value, true ) . '<br>';
 					}
 				}
 			}
@@ -1732,6 +1761,12 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			$args = $this->args;
 			$namespace = $this->namespace;
 			$options = $this->options;
+			
+			// --- get plugin options and default settings ---
+			// 1.1.2: fix for filtering of plugin options
+			$options = $this->options;
+			$options = apply_filters( $namespace . '_options', $options );
+		
 			$defaults = $this->default_settings();
 			$settings = $this->get_settings( false );
 
@@ -1821,10 +1856,8 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			wp_nonce_field( $args['slug'] . '_update_settings' );
 
 			// --- maybe set hidden debug input ---
-			if ( isset( $_REQUEST['debug'] ) ) {
-				if ( ( 'yes' == $_REQUEST['debug'] ) || ( '1' == $_REQUEST['debug'] ) ) {
-					echo "<input type='hidden' name='debug' value='yes'>";
-				}
+			if ( $this->debug ) {
+				echo "<input type='hidden' name='debug' value='yes'>";
 			}
 
 			// ---- open wrapbox ---
@@ -1958,9 +1991,9 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 
 		}
 
-		// ------------
+		// -----------
 		// Setting Row
-		// ------------
+		// -----------
 		// 1.0.9: added for automatic Settings table generation
 		public function setting_row( $option ) {
 
@@ -2223,7 +2256,7 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 						$radios = array();
 						foreach ( $option['options'] as $value => $label ) {
 							$checked = '';
-							if ( $setting === $value ) {
+							if ( $setting == $value ) {
 								$checked = " checked='checked'";
 							}
 							$radios[] = "<input type='radio' class='setting-radio' name='" . esc_attr( $name ) . "' value='" . esc_attr( $value ) . "'" . $checked . "> " . esc_html( $label );
@@ -2239,7 +2272,8 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 							if ( strstr( $value, '*OPTGROUP*' ) ) {
 								$row .= "<optgroup label='" . esc_attr( $label ) . "'>" . esc_html( $label ) . '</optgroup>';
 							} else {
-								if ( $setting === $value ) {
+								// 1.1.3: remove strict value checking
+								if ( $setting == $value ) {
 									$selected = " selected='selected'";
 								} else {
 									$selected = '';
@@ -2258,9 +2292,8 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 						$row .= "<select multiple='multiple' class='setting-select' name='" . esc_attr( $name ) . "[]'>";
 						foreach ( $option['options'] as $value => $label ) {
 							if ( '' != $value ) {
-								// TODO: check use of OPTGROUP vs *OPTGROUP* ?
-								// if ($value === 'OPTGROUP') {
-								if ( strstr( $value, '*OPTGROUP*' ) ) {
+								// 1.1.3: check for OPTGROUP instead of *OPTGROUP*
+								if ( strstr( $value, 'OPTGROUP' ) ) {
 									$row .= "<optgroup label='" . esc_attr( $label ) . "'>";
 								} else {
 									if ( is_array( $setting ) && in_array( $value, $setting ) ) {
@@ -2365,9 +2398,9 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			return $row;
 		}
 
-		// ----------------
-		// Settings Scripts
-		// ----------------
+		// ---------------
+		// Setting Scripts
+		// ---------------
 		// 1.0.9: added settings page scripts
 		public function setting_scripts() {
 
@@ -2382,9 +2415,9 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 			}
 		}
 
-		// ---------------
-		// Settings Styles
-		// ---------------
+		// --------------
+		// Setting Styles
+		// --------------
 		public function setting_styles() {
 
 			$styles = array();
@@ -2460,10 +2493,10 @@ if ( !class_exists( 'ENGINE_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'ENGINE_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'PREFIX_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
-	function ENGINE_load_prefixed_functions() {
+if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
+	function PREFIX_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -2472,8 +2505,8 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'ENGINE_get_ENGINE_slug' ) ) {
-			function ENGINE_get_ENGINE_slug( $f ) {
+		if ( !function_exists( 'PREFIX_get_PREFIX_slug' ) ) {
+			function PREFIX_get_PREFIX_slug( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -2482,21 +2515,21 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'ENGINE_loader_instance' ) ) {
-			function ENGINE_loader_instance() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_loader_instance' ) ) {
+			function PREFIX_loader_instance() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
 		}
 
-		// -------------------
-		// Get Loader Instance
-		// -------------------
+		// ---------------------
+		// Get Freemius Instance
+		// ---------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'ENGINE_freemius_instance' ) ) {
-			function ENGINE_freemius_instance() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_freemius_instance' ) ) {
+			function PREFIX_freemius_instance() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -2505,22 +2538,50 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Get Plugin Data
 		// ---------------
-		// 2.3.0: added function for getting plugin data
-		if ( !function_exists( 'ENGINE_plugin_data' ) ) {
-			function ENGINE_plugin_data() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		// 1.1.1: added function for getting plugin data
+		if ( !function_exists( 'PREFIX_plugin_data' ) ) {
+			function PREFIX_plugin_data() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
 			}
 		}
 
+		// ------------------
+		// Get Plugin Version
+		// ------------------
+		// 1.1.2: added function for getting plugin version
+		if ( !function_exists( 'PREFIX_plugin_version' ) ) {
+			function PREFIX_plugin_version() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+				$instance = $GLOBALS[$namespace . '_instance'];
+
+				return $instance->plugin_version();
+			}
+		}
+
+		// -----------------
+		// Set Pro Namespace
+		// -----------------
+		if ( !function_exists( 'PREFIX_pro_namespace' ) ) {
+			function PREFIX_pro_namespace( $pronamespace ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+				$instance = $GLOBALS[$namespace . '_instance'];
+				$instance->pro_namespace( $pronamespace );
+			}
+		}
+
+		// ===============
+		// Plugin Settings
+		// ===============
+
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'ENGINE_add_settings' ) ) {
-			function ENGINE_add_settings() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_add_settings' ) ) {
+			function PREFIX_add_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -2529,9 +2590,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'ENGINE_default_settings' ) ) {
-			function ENGINE_default_settings( $key = false ) {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_default_settings' ) ) {
+			function PREFIX_default_settings( $key = false ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -2541,9 +2602,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'ENGINE_get_options' ) ) {
-			function ENGINE_get_options() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_get_options' ) ) {
+			function PREFIX_get_options() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -2553,9 +2614,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'ENGINE_get_setting' ) ) {
-			function ENGINE_get_setting( $key, $filter = true ) {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_get_setting' ) ) {
+			function PREFIX_get_setting( $key, $filter = true ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -2566,9 +2627,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'ENGINE_get_settings' ) ) {
-			function ENGINE_get_settings( $filter = true ) {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_get_settings' ) ) {
+			function PREFIX_get_settings( $filter = true ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -2578,9 +2639,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'ENGINE_reset_settings' ) ) {
-			function ENGINE_reset_settings() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_reset_settings' ) ) {
+			function PREFIX_reset_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -2589,9 +2650,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'ENGINE_update_settings' ) ) {
-			function ENGINE_update_settings() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_update_settings' ) ) {
+			function PREFIX_update_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -2600,31 +2661,22 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'ENGINE_delete_settings' ) ) {
-			function ENGINE_delete_settings() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_delete_settings' ) ) {
+			function PREFIX_delete_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
 		}
-
-		// -----------------
-		// Set Pro Namespace
-		// -----------------
-		if ( !function_exists( 'ENGINE_pro_namespace' ) ) {
-			function ENGINE_pro_namespace( $pronamespace ) {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
-				$instance = $GLOBALS[$namespace . '_instance'];
-				$instance->pro_namespace( $pronamespace );
-			}
-		}
+		
+		
 
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'ENGINE_message_box' ) ) {
-			function ENGINE_message_box( $message, $echo = false ) {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_message_box' ) ) {
+			function PREFIX_message_box( $message, $echo = false ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -2634,9 +2686,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'ENGINE_settings_header' ) ) {
-			function ENGINE_settings_header() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_header' ) ) {
+			function PREFIX_settings_header() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -2645,9 +2697,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'ENGINE_settings_page' ) ) {
-			function ENGINE_settings_page() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_page' ) ) {
+			function PREFIX_settings_page() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -2657,9 +2709,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'ENGINE_settings_table' ) ) {
-			function ENGINE_settings_table() {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_table' ) ) {
+			function PREFIX_settings_table() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -2669,9 +2721,9 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'ENGINE_settings_row' ) ) {
-			function ENGINE_settings_row( $option, $setting ) {
-				$namespace = ENGINE_get_ENGINE_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_row' ) ) {
+			function PREFIX_settings_row( $option, $setting ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -2685,11 +2737,62 @@ if ( !function_exists( 'ENGINE_load_prefixed_functions' ) ) {
 
 
 // =========
+// STRUCTURE
+// =========
+//
+// === Loader Class ===
+// - Initialize Loader
+// - Setup Plugin
+// - Get Plugin Data
+// - Get Plugin Version
+// - Set Pro Namespace
+// === Plugin Settings ===
+// - Get Default Settings
+// - Add Settings
+// - Maybe Transfer Settings
+// - Get All Plugin Settings
+// - Get Plugin Setting
+// - Reset Plugin Settings
+// - Update Plugin Settings
+// - Validate Plugin Setting
+// === Plugin Loading ===
+// - Load Plugin Settings
+// - Add Actions
+// - Load Helper Libraries
+// - Maybe Load Thickbox
+// - Readme Viewer AJAX
+// === Freemius Loading ===
+// - Load Freemius
+// - Filter Freemius Connect
+// - Freemius Connect Message
+// - Connect Update Message
+// === Plugin Admin ===
+// - Add Settings Menu
+// - Plugin Page Links
+// - Message Box
+// - Notice Boxer
+// - Plugin Page Header
+// - Settings Page
+// - Settings Table
+// - Setting Row
+// - Settings Scripts
+// - Settings Styles
+// === Namespaced Functions ===
+
+
+// =========
 // CHANGELOG
 // =========
 
+// == 1.1.3 ==
+// - remove strict value checking on select input
+// - change OPTGROUP string check in select options
+
 // == 1.1.2 ==
-// - redirect fix for Settings menu and plugin page link URL
+// - fix for filtering of plugin options
+// - fix for plugin page link URL
+// - added menu added and debug switches
+// - added get plugin version function
 
 // == 1.1.1 ==
 // - remove admin_url wrapper on Freemius first-path value
