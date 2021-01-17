@@ -7,7 +7,7 @@
 
 // Loader Usage:
 // =============
-// 1. replace all occurrences of NAMESPACE in this file with the plugin namespace
+// 1. replace all occurrences of automedic in this file with the plugin namespace
 // 2. define plugin options, default settings, and setup arguments in the plugin file
 // 3. after definitions, require this file in the main plugin file (example below)
 
@@ -70,15 +70,15 @@
 // Start Plugin Loader Instance
 // ----------------------------
 // require(dirname(__FILE__).'/loader.php');	// requires this file!
-// new NAMESPACE_Loader($args);					// instantiates loader class
+// new automedic_loader($args);					// instantiates loader class
 
 
 
 // ==============================
-// --- NAMESPACE Loader Class ---
+// --- automedic Loader Class ---
 // ==============================
-// usage: simply change NAMESPACE to the plugin function prefix
-class NAMESPACE_loader {
+// usage: simply change automedic to the plugin function prefix
+class automedic_loader {
 
 	public $args = null;
 	public $namespace = null;
@@ -89,13 +89,13 @@ class NAMESPACE_loader {
 	// -----------------
 	// Initialize Loader
 	// -----------------
-	function init($args) {
+	function __construct($args) {
 
-		// set plugin namespace
-		$this->namespace = $args['namespace'];
-
-		// set options
+		// set plugin options
 		$this->options = $args['options']; unset($args['options']);
+
+		// set plugin args and namespace
+		$this->args = $args; $this->namespace = $args['namespace'];
 
 		// setup values
 		$this->setup_plugin();
@@ -112,7 +112,7 @@ class NAMESPACE_loader {
 		// load helper libraries
 		$this->load_helpers();
 
-		// set this class instance to global for accessibility
+		// set class instance global for accessibility
 		$GLOBALS[$args['namespace'].'_instance'] = $this;
 	}
 
@@ -123,18 +123,18 @@ class NAMESPACE_loader {
 		$args = $this->args; $namespace = $this->namespace;
 
 		// --- Read Plugin Header ---
-		if (!isset($args['dir'])) {$args['dir'] = dirname(__FILE__);}
-		$fh = fopen($args['file'], 'r'); $data = fread($fh, 2048);
+		if (!isset($args['dir'])) {$args['dir'] = dirname($args['file']);}
+		$fh = fopen($args['file'], 'r'); $data = fread($fh, 1024);
 		$this->data = str_replace("\r", "\n", $data); fclose($fh);
+
+		// --- Version ---
+		$args['version'] = $this->plugin_data('Version:');
 
 		// --- Title ---
 		if (!isset($args['title'])) {$args['title'] = $this->plugin_data('Plugin Name:');}
 
 		// --- Plugin Home ---
 		if (!isset($args['home'])) {$args['home'] = $this->plugin_data('Plugin URI:');}
-
-		// --- Version ---
-		if (!isset($args['version'])) {$args['version'] = $this->plugin_data('Version:');}
 
 		// --- Author ---
 		if (!isset($args['author'])) {$args['author'] = $this->plugin_data('Author:');}
@@ -152,13 +152,6 @@ class NAMESPACE_loader {
 		$this->args = $args;
 	}
 
-	// -----------------
-	// Set Pro Namespace
-	// -----------------
-	function pro_namespace($pronamespace) {
-		$this->args['pronamspace'] = $pronamespace;
-	}
-
 	// ---------------
 	// Get Plugin Data
 	// ---------------
@@ -174,6 +167,13 @@ class NAMESPACE_loader {
 		return $value;
 	}
 
+	// -----------------
+	// Set Pro Namespace
+	// -----------------
+	function pro_namespace($pronamespace) {
+		$this->args['pronamespace'] = $pronamespace;
+	}
+
 	// --------------------
 	// Get Default Settings
 	// --------------------
@@ -187,7 +187,7 @@ class NAMESPACE_loader {
 		}
 
 		// filter and store the plugin default settings
-		$options = $args->options; $defaults = array();
+		$options = $this->options; $defaults = array();
 		foreach ($options as $key => $values) {$defaults[$key] = $values['default'];}
 		$namespace = $this->namespace;
 		$defaults = apply_filters($namespace.'_default_settings', $defaults);
@@ -222,9 +222,8 @@ class NAMESPACE_loader {
 	function maybe_transfer_settings() {
 		$namespace = $this->namespace; $funcname = $namespace.'_transfer_settings';
 		// check for either function prefixed or class extended method
-		if (method_exists($this, 'transfer_settings')) {$settings = $this->transfer_settings();}
-		elseif (function_exists($funcname)) {$settings = call_user_func($funcname);}
-		$GLOBALS[$namespace] = $settings;
+		if (method_exists($this, 'transfer_settings')) {$this->transfer_settings();}
+		elseif (function_exists($funcname)) {call_user_func($funcname);}
 	}
 
 	// ----------------
@@ -241,7 +240,7 @@ class NAMESPACE_loader {
 	// Get Plugin Setting
 	// ------------------
 	function get_setting($key, $filter=true) {
-		$namepace = $this->namespace; $settings = $GLOBALS[$namespace];
+		$namespace = $this->namespace; $settings = $GLOBALS[$namespace];
 		$settings = apply_filters($namespace.'_settings', $settings);
 
 		if (isset($settings[$key])) {$value = $settings[$key];}
@@ -261,8 +260,10 @@ class NAMESPACE_loader {
 		$args = $this->args; $namespace = $this->namespace;
 
 		// check triggers and permissions
-		if (!isset($_POST[$args['settings'].'_update_settings'])) {return;}
-		if ($_POST[$settings['args'].'_update_settings'] != 'reset') {return;}
+		if (!isset($_POST[$args['settings'].'_update_settings'])
+		 && !isset($_POST[$args['namspace'].'_update_settings'])) {return;}
+		if (($_POST[$args['settings'].'_update_settings'] != 'reset')
+		 && ($_POST[$args['namespace'].'_update_settings'] != 'reset')) {return;}
 		$capability = apply_filters($args['namespace'].'_manage_options_capability', 'manage_options');
 		if (!current_user_can($capability)) {return;}
 		check_admin_referer($args['slug']);
@@ -287,37 +288,48 @@ class NAMESPACE_loader {
 		$settings = $GLOBALS[$namespace];
 
 		// check triggers and permissions
-		if (!isset($_POST[$settings['settings'].'_update_settings'])) {return;}
-		if ($_POST[$settings['settings'].'_update_settings'] != 'yes') {return;}
+		if (!isset($_POST[$args['settings'].'_update_settings'])
+		 && !isset($_POST[$args['namspace'].'_update_settings'])) {return;}
+		if (($_POST[$args['settings'].'_update_settings'] != 'yes')
+		 && ($_POST[$args['namespace'].'_update_settings'] != 'yes')) {return;}
 		$capability = apply_filters($namespace.'_manage_options_capability', 'manage_options');
 		if (!current_user_can($capability)) {return;}
-		check_admin_referer($settings['slug']);
+		check_admin_referer($args['slug']);
 
 		// get plugin options and defaults
 		$options = $this->options;
 		$defaults = $this->default_settings();
 
 		// maybe use custom function or method
+		$funcname = $namespace.'_process_settings';
 		if (method_exists($this, 'process_settings')) {
-			// check for an extended method to this class
+			// use class extended method if found
 			$settings = $this->process_settings();
-		} elseif (function_exists($namespace.'_process_settings')) {
-			// check for a namespace prefixed function
-			$settings = call_user_func($namespace.'_process_settings', $options);
+		} elseif (function_exists($funcname) && is_callable($funcname))  {
+			// use namespace prefixed function if found
+			$settings = call_user_func($namespace.'_process_settings');
 		} else {
-			// loop plugin options
-			foreach ($options as $key => $type) {
+			// default loop of plugin options to get new settings
+			foreach ($options as $key => $values) {
+
+				// get option type and options
+				$type = $values['type']; $valid = array();
+				if (isset($values['options'])) {$valid = $values['options'];}
+
 				// get posted value
 				$postkey = $args['settings'].'_'.$key;
 				if (isset($_POST[$postkey])) {$posted = $_POST[$postkey];}
 
 				// sanitize value according to type
-				// TODO: add to these sanitization types from/for plugins
+				// TODO: add to these sanitization types from/for plugins ?
 				if (strstr($type, '/')) {
 					$valid = explode('/', $type);
 					if (in_array($posted, $valid)) {$settings[$key] = $posted;}
+				} elseif ( ($type == 'radio') || ($type == 'select') ) {
+					if (in_array($posted, $valid)) {$settings[$key] = $posted;}
 				} elseif ($type == 'checkbox') {
-					if ( ($posted == '') || ($posted == 'yes') ) {$settings[$key] = $posted;}
+					$valid = array('', 'yes', '1', 'checked');
+					if (in_array($posted, $valid)) {$settings[$key] = $posted;}
 				} elseif ($type == 'numeric') {
 					$posted = absint($posted);
 					if (is_numeric($posted)) {$settings[$key] = $posted;}
@@ -335,26 +347,33 @@ class NAMESPACE_loader {
 			}
 		}
 
-		// loop default keys to remove others
-		$settings_keys = array_keys($defaults);
-		foreach ($settings as $key => $value) {
-			if (!in_array($key, $settings_keys)) {unset($settings[$key]);}
-		}
+		if ($settings && is_array($settings)) {
 
-		// update the plugin settings
-		$settings['savetime'] = time();
-		update_option($args['option'], $settings);
+			// loop default keys to remove others
+			$settings_keys = array_keys($defaults);
+			foreach ($settings as $key => $value) {
+				if (!in_array($key, $settings_keys)) {unset($settings[$key]);}
+			}
 
-		// merge with existing settings for pageload
-		foreach ($settings as $key => $value) {$GLOBALS[$namespace][$key] = $value;}
+			// update the plugin settings
+			$settings['savetime'] = time();
+			update_option($args['option'], $settings);
 
-		// set settings update message flag
-		$_GET['updated'] = 'yes';
+			// merge with existing settings for pageload
+			foreach ($settings as $key => $value) {$GLOBALS[$namespace][$key] = $value;}
+
+			// set settings update message flag
+			$_GET['updated'] = 'yes';
+
+		} else {$_GET['updated'] = 'no';}
 
 		// maybe update pro settings
-		if (isset($args['pronamespace'])) {$funcname = $args['pronamespace'].'_update_settings';}
-		else {$funcname = $args['namespace'].'_pro_update_settings';}
-		if (function_exists($funcname)) {call_user_func($funcname);}
+		if (method_exists($this, 'pro_update_settings')) {$this->pro_update_settings();}
+		else {
+			if (isset($args['pronamespace'])) {$funcname = $args['pronamespace'].'_update_settings';}
+			else {$funcname = $args['namespace'].'_pro_update_settings';}
+			if (function_exists($funcname)) {call_user_func($funcname);}
+		}
 
 	}
 
@@ -391,7 +410,8 @@ class NAMESPACE_loader {
 	// Add Actions
 	// -----------
 	function add_actions() {
-		$args = $this->args;
+		$args = $this->args; $namespace = $this->namespace;
+
 		// add settings on activation
 		register_activation_hook($args['file'], array($this, 'add_settings'));
 
@@ -411,6 +431,8 @@ class NAMESPACE_loader {
 		// maybe load thickbox
 		add_action('admin_enqueue_scripts', array($this, 'maybe_load_thickbox'));
 
+		// ajax readme viewer
+		add_action('wp_ajax_'.$namespace.'_readme_viewer', array($this, 'readme_viewer'));
 	}
 
 	// ---------------------
@@ -457,6 +479,60 @@ class NAMESPACE_loader {
 	function maybe_load_thickbox() {
 		$args = $this->args;
 		if (isset($_REQUEST['page']) && ($_REQUEST['page'] == $args['slug'])) {add_thickbox();}
+	}
+
+	// -------------
+	// Readme Viewer
+	// -------------
+	function readme_viewer() {
+		$args = $this->args;
+
+		echo "<html><body style='font-family: Consolas, \"Lucida Console\", Monaco, FreeMono, monospace'>";
+
+		$readme = dirname($args['file']).'/readme.txt';
+		$contents = file_get_contents($readme);
+		$parser = dirname($args['file']).'/readme.php';
+
+		if (file_exists($parser)) {
+
+			include($parser);
+			$contents = str_replace('License: GPLv2 or later', '', $contents);
+			$contents = str_replace('License URI: http://www.gnu.org/licenses/gpl-2.0.html', '', $contents);
+
+			$readme = new WordPress_Readme_Parser;
+			$parsed = $readme->parse_readme_contents($contents);
+
+			echo "<b>Plugin Name</b>: ".$parsed['name']."<br>";
+			// echo "<b>Tags</b>: ".implode(', ', $parsed['tags'])."<br>";
+			echo "<b>Requires at least</b>: WordPress v".$parsed['requires_at_least']."<br>";
+			echo "<b>Tested up to</b>: WordPress v".$parsed['tested_up_to']."<br>";
+			if (isset($parsed['stable_tag'])) {echo "<b>Stable Tag</b>: ".$parsed['stable_tag']."<br>";}
+			echo "<b>Contributors</b>: ".implode(', ', $parsed['contributors'])."<br>";
+			// echo "<b>Donate Link</b>: <a href='".$parsed['donate_link']."' target=_blank>".$parsed['donate_link']."</a><br>";
+			echo "<br>".$parsed['short_description']."<br><br>";
+
+			// possible sections: 'description', 'installation', 'frequently_asked_questions',
+			// 'screenshots', 'changelog', 'change_log', 'upgrade_notice'
+			$strip = array('installation', 'screenshots');
+			foreach ($parsed['sections'] as $key => $section) {
+				if (!empty($section) && !in_array($key, $strip)) {
+					if (strstr($key, '_')) {$parts = explode('_', $key);} else {$parts = array(); $parts[0] = $key;}
+					foreach ($parts as $i => $part) {$parts[$i] = strtoupper(substr($part, 0, 1)).substr($part, 1);}
+					$title = implode(' ', $parts);
+					echo "<h3>".$title."</h3>";
+					echo $section;
+				}
+			}
+			if (isset($parsed['remaining_content']) && !empty($remaining_content)) {
+				echo "<h3>Extra Notes</h3>".$parsed['remaining_content'];
+			}
+
+		} else {
+			$readme = dirname($args['file']).'/readme.txt';
+			$contents = str_replace("\n", "<br>", $contents);
+			echo $contents;
+		}
+		echo "</body></html>"; exit;
 	}
 
 
@@ -536,7 +612,7 @@ class NAMESPACE_loader {
 				'is_premium'        => $premium,
 				'menu'              => array(
 					'slug'       	=> $args['slug'],
-					'first-path' 	=> 'admin.php?page='.$settings['slug'].'&welcome=true',
+					'first-path' 	=> 'admin.php?page='.$args['slug'].'&welcome=true',
 					'contact'		=> $args['contact'],
 					'support'		=> $args['support'],
 					'account'		=> $args['account'],
@@ -591,7 +667,7 @@ class NAMESPACE_loader {
 	// Add Settings Menu
 	// -----------------
 	function settings_menu() {
-		$namespace = $this->namespace; $settings = $GLOBALS[$namespace];
+		$args = $this->args; $namespace = $this->namespace; $settings = $GLOBALS[$namespace];
 
 		$args['capability'] = apply_filters($args['namespace'].'_manage_options_capability', 'manage_options');
 		if (!isset($args['pagetitle'])) {$args['pagetitle'] = $args['title'];}
@@ -667,45 +743,78 @@ class NAMESPACE_loader {
 	function settings_header() {
 		$args = $this->args; $namespace = $this->namespace; $settings = $GLOBALS[$namespace];
 
-		$icon_url = plugins_url('images/'.$args['slug'].'.png', $args['file']);
+		// check for animated gif icon with fallback to normal icon
+		if (file_exists($this->args['dir'].'/images/'.$args['slug'].'.gif')) {
+			$icon_url = plugins_url('images/'.$args['slug'].'.gif', $args['file']);
+		} else {$icon_url = plugins_url('images/'.$args['slug'].'.png', $args['file']);}
 		$icon_url = apply_filters($namespace.'_plugin_icon_url', $icon_url);
-		$wpmedic_icon_url = plugins_url('images/wpmedic.png', $args['file']);
-		$wordquest_icon_url = plugins_url('images/wordquest.png', $args['file']);
-		echo "<table><tr><td><img src='".$icon_url."'></td>";
+
+		// check for author icon based on provided author name
+		$author_icon_slug = strtolower(str_replace(' ', '', $args['author']));
+		$author_icon_url = plugins_url('images/'.$author_icon_slug.'.png', $args['file']);
+		$author_icon_url = apply_filters($namespace.'_author_icon_url', $author_icon_url);
+
+		echo "<style>.pluginlink {text-decoration:none;} .readme:hover {text-decoration:underline;}</style>";
+		echo "<table><tr><td><img src='".$icon_url."' width='128' height='128'></td>";
 		echo "<td width='20'></td><td>";
 			echo "<table><tr><td>";
 				echo "<h2 style='font-size:20px;'><a href='".$args['home']."' style='text-decoration:none;'>".$args['title']."</a></h2></a>";
 			echo "</td><td width='20'></td>";
 			echo "<td><h3>v".$args['version']."</h3></td></tr>";
 			echo "<tr><td colspan='3' align='center'>";
-				echo "<table><tr><td><font style='font-size:16px;'>".__('by')."</font></td>";
-				echo "<td><a href='".$args['author_url']."' target=_blank style='text-decoration:none;font-size:16px;' target=_blank><b>".$args['author']."</b></a></td>";
-				echo "<td><a href='".$args['author_url']."' target=_blank><img src='".$wpmedic_icon_url."' width='64' height='64' border='0'></td></tr></table>";
+				echo "<table><tr><td align='center'>";
+					echo "<font style='font-size:16px;'>".__('by')."</font> ";
+					echo "<a href='".$args['author_url']."' target=_blank style='text-decoration:none;font-size:16px;' target=_blank><b>".$args['author']."</b></a><br><br>";
+					$readme_url = add_query_arg('action', $namespace.'_readme_viewer', admin_url('admin-ajax.php'));
+					echo "<a href='".$readme_url."' class='pluginlink thickbox' title='readme.txt'><b>".__('Readme')."</b></a>";
+					if (isset($args['docs'])) {echo " | <a href='".$args['docs']."' class='pluginlink' target=_blank><b>".__('Docs')."</b></a>";}
+					if (isset($args['support'])) {echo " | <a href='".$args['support']."' class='pluginlink' target=_blank><b>".__('Support')."</b></a>";}
+				echo "</td><td>";
+					echo "<a href='".$args['author_url']."' target=_blank><img src='".$author_icon_url."' width='64' height='64' border='0'>";
+				echo "</td></tr></table>";
 			echo "</td></tr></table>";
-		echo "</td><td width='50'></td><td align='center' style='vertical-align:top;'>";
+		echo "</td><td width='50'></td><td>";
 
-			// readme thickbox link
-			// $readme_url = plugins_url('readme.txt', $args['file'];
-			// echo "<br><a href='".$readme_url."' class='thickbox'><b>".__('Readme')."</b></a>";
-			// if (isset($settings['docs'])) {echo " | <a href='".$settings['docs']."' target=_blank><b>".__('Docs')."</b></a>";}
-			// if (isset($settings['home'])) {echo " | <a href='".$settings['home']."' target=_blank><b>".__('Home')."</b></a>";}
-			// echo "<br><br>";
-
-			// updated and reset messages
-			if (isset($_GET['updated'])) {
-				if ($_GET['updated'] == 'yes') {$message = $settings['title'].' '.__('Settings Updated.');}
-				elseif ($_GET['updated'] == 'reset') {$message = $settings['title'].' '.__('Settings Reset!');}
-				if (isset($message)) {$this->message_box($message, true);}
+			// echo "<span style='font-size:24px; color:#E0E; margin-right:10px;' class='dashicons dashicons-share'></span> ".__('Share the Plugin Love')."<br><br>";
+			if (isset($args['wporgslug'])) {
+				$rate_url = 'https://wordpress.org/plugins/'.$args['wporgslug'].'/reviews/#newpost';
+				echo "<span style='font-size:24px; color:#FC5; margin-right:10px;' class='dashicons dashicons-star-filled'></span> ";
+				echo "<a href='".$rate_url."' class='pluginlink' target=_blank>".__('Rate on WordPress.Org')."</a><br><br>";
 			}
-		echo "</td></tr></table><br>";
+			if (isset($args['donate'])) {
+				echo "<span style='font-size:24px; color:#E00; margin-right:10px;' class='dashicons dashicons-heart'></span> ";
+				echo "<a href='".$args['donate']."' class='pluginlink' target=_blank>".__('Support WP Medic')."<br><br>";
+			}
+
+		echo "</td></tr>";
+
+		// updated and reset messages
+		if (isset($_GET['updated'])) {
+			if ($_GET['updated'] == 'yes') {$message = $settings['title'].' '.__('Settings Updated.');}
+			elseif ($_GET['updated'] == 'no') {$message = __('Error! Settings NOT Updated');}
+			elseif ($_GET['updated'] == 'reset') {$message = $settings['title'].' '.__('Settings Reset!');}
+			if (isset($message)) {
+				echo "<tr><td></td><td></td><td align='center'>".$this->message_box($message, false)."</td></tr>";
+			}
+		} else {
+			// maybe output welcome message
+			if (isset($_REQUEST['welcome']) && ($_REQUEST['welcome'] == 'true')) {
+				if (isset($args['welcome'])) {
+					echo "<tr><td colspan='3' align='center'>".$this->message_box($args['welcome'], false)."</td></tr>";
+				}
+			}
+		}
+
+		echo "</table><br>";
 	}
 
 	// -------------
 	// Settings Page
 	// -------------
 	function settings_page() {
-		// TODO: could create and automatic settings page here
+		// TODO: could create an automatic settings page here
 		// based on the passed plugin options and default settings...
+		// ...or not.
 	}
 
 } // end plugin loader class
@@ -714,24 +823,31 @@ class NAMESPACE_loader {
 // ----------------------------------
 // Load Namespaced Prefixed Functions
 // ----------------------------------
-// [Optional] rename the NAMESPACE to your plugin namespace
+// [Optional] rename the automedic to your plugin namespace
 // these functions will then be available within your plugin
 // to more easily call the matching plugin loader class methods
 
-add_action('plugins_loaded', 'NAMESPACE_namespaced_functions');
-function NAMESPACE_load_prefixed_functions() {
+add_action('plugins_loaded', 'automedic_load_prefixed_functions');
+function automedic_load_prefixed_functions() {
 
 	// auto-magic namespacing note
 	// ---------------------------
 	// all function names suffixes here must be two words for the magic namespace grabber to work
 	// ie. _add_settings, because the namespace is taken from before the second-last underscore
 
+	if (!function_exists('automedic_loader_instance')) {
+		function automedic_loader_instance() {
+			$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
+			return $GLOBALS[$namespace.'_instance'];
+		}
+	}
+
 	// ------------
 	// Add Settings
 	// ------------
-	if (!function_exists('NAMESPACE_add_settings')) {
-	 function NAMESPACE_add_settings() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_add_settings')) {
+	 function automedic_add_settings() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->add_settings();
 	 }
@@ -740,9 +856,9 @@ function NAMESPACE_load_prefixed_functions() {
 	// ------------
 	// Get Defaults
 	// ------------
-	if (!function_exists('NAMESPACE_default_settings')) {
-	 function NAMESPACE_default_settings($key=false) {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_default_settings')) {
+	 function automedic_default_settings($key=false) {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->default_settings($key);
 	 }
@@ -751,9 +867,9 @@ function NAMESPACE_load_prefixed_functions() {
 	// -----------
 	// Get Options
 	// -----------
-	if (!function_exists('NAMESPACE_get_options')) {
-	 function NAMESPACE_get_options() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_get_options')) {
+	 function automedic_get_options() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->options;
 	 }
@@ -762,9 +878,9 @@ function NAMESPACE_load_prefixed_functions() {
 	// -----------
 	// Get Setting
 	// -----------
-	if (!function_exists('NAMESPACE_get_setting')) {
-	 function NAMESPACE_get_setting($key, $filter=true) {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_get_setting')) {
+	 function automedic_get_setting($key, $filter=true) {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		return $instance->get_setting($key, $filter);
 	 }
@@ -773,9 +889,9 @@ function NAMESPACE_load_prefixed_functions() {
 	// --------------
 	// Reset Settings
 	// --------------
-	if (!function_exists('NAMESPACE_reset_settings')) {
-	 function NAMESPACE_reset_settings() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_reset_settings')) {
+	 function automedic_reset_settings() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->reset_settings();
 	 }
@@ -784,9 +900,9 @@ function NAMESPACE_load_prefixed_functions() {
 	// ---------------
 	// Update Settings
 	// ---------------
-	if (!function_exists('NAMESPACE_update_settings')) {
-	 function NAMESPACE_update_settings() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_update_settings')) {
+	 function automedic_update_settings() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->update_settings();
 	 }
@@ -795,20 +911,31 @@ function NAMESPACE_load_prefixed_functions() {
 	// ---------------
 	// Delete Settings
 	// ---------------
-	if (!function_exists('NAMESPACE_delete_settings')) {
-	 function NAMESPACE_delete_settings() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_delete_settings')) {
+	 function automedic_delete_settings() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->delete_settings();
+	 }
+	}
+
+	// -----------------
+	// Set Pro Namespace
+	// -----------------
+	if (!function_exists('automedic_pro_namespace')) {
+	 function automedic_pro_namespace($namespace) {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
+		$instance = $GLOBALS[$namespace.'_instance'];
+		$instance->pro_namespace($namespace);
 	 }
 	}
 
 	// ---------------
 	// Settings Header
 	// ---------------
-	if (!function_exists('NAMESPACE_settings_header')) {
-	 function NAMESPACE_settings_header() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_settings_header')) {
+	 function automedic_settings_header() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->settings_header();
 	 }
@@ -817,14 +944,24 @@ function NAMESPACE_load_prefixed_functions() {
 	// -------------
 	// Settings Page
 	// -------------
-	if (!function_exists('NAMESPACE_settings_page')) {
-	 function NAMESPACE_settings_page() {
-		$f = __FUNCTION__; $namespace = substr($f, 0, strrpos($f, '_', (strrpos($f, '_') - strlen($f) - 1)));
+	if (!function_exists('automedic_settings_page')) {
+	 function automedic_settings_page() {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
 		$instance = $GLOBALS[$namespace.'_instance'];
 		$instance->settings_page();
 	 }
 	}
 
+	// -----------
+	// Message Box
+	// -----------
+	if (!function_exists('automedic_message_box')) {
+	 function automedic_message_box($message, $echo=false) {
+		$f = __FUNCTION__; $namespace = substr($f,0,strrpos($f,'_',(strrpos($f,'_')-strlen($f)-1)));
+		$instance = $GLOBALS[$namespace.'_instance'];
+		return $instance->message_box($message, $echo);
+	 }
+	}
 }
 
 // fully loaded
