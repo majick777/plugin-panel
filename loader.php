@@ -5,14 +5,14 @@
 // ===========================
 //
 // --------------
-// Version: 1.1.4
+// Version: 1.1.5
 // --------------
 // Note: Changelog and structure at end of file.
 //
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of radio_station_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of PREFIX_ in this file with the plugin namespace prefix eg. my_plugin_
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -88,16 +88,16 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new radio_station_loader($args);				// instantiates loader class
-// (ie. search and replace 'radio_station_' with 'my_plugin_' function namespace)
+// $instance = new PREFIX_loader($args);				// instantiates loader class
+// (ie. search and replace 'PREFIX_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'radio_station_loader' ) ) {
-	class radio_station_loader {
+if ( !class_exists( 'PREFIX_loader' ) ) {
+	class PREFIX_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -114,7 +114,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 		// 1.1.2: added debug switch
 		public $menu_added = false;
 		public $debug = false;
-		
+
 		// -----------------
 		// Initialize Loader
 		// -----------------
@@ -122,7 +122,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 
 			// --- set debug switch ---
 			// 1.1.2: added debug switch check
-			$prefix = ''; 
+			$prefix = '';
 			if ( $args['settings'] ) {
 				// 1.1.4: fix to debug prefix key
 				$prefix = $args['settings'] . '-';
@@ -247,7 +247,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 
 			return $value;
 		}
-		
+
 		// ------------------
 		// Get Plugin Version
 		// ------------------
@@ -288,7 +288,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 			// 1.1.2: fix to apply options filter
 			$namespace = $this->namespace;
 			$options = $this->options;
-			$options = apply_filters( $namespace . '_options', $options );			
+			$options = apply_filters( $namespace . '_options', $options );
 			$defaults = array();
 			foreach ( $options as $key => $values ) {
 				// 1.0.9: set default to null if default value not set
@@ -313,7 +313,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 		public function add_settings() {
 
 			// --- add the default plugin settings ---
-			$args = $this->args; 
+			$args = $this->args;
 			$defaults = $this->default_settings();
 			$added = add_option( $args['option'], $defaults );
 
@@ -323,7 +323,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 				foreach ( $defaults as $key => $value ) {
 					$GLOBALS[$namespace][$key] = $value;
 				}
-				
+
 				// --- record first installed version ---
 				// 1.1.0: added record for tracking first install version
 				add_option( $args['option'] . '_first_install', $args['version'] );
@@ -572,7 +572,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 					}
 
 					if ( $this->debug ) {
-						echo 'Saving Setting Key ' . $key . ' (' . $postkey . ': ' . print_r( $posted, true ) . '<br>';
+						echo 'Saving Setting Key ' . $key . ' (' . $postkey . '): ' . print_r( $posted, true ) . '<br>';
 						echo 'Type: ' . $type . ' - Valid Options ' . $key . ': ' . print_r( $valid, true ) . '<br>';
 					}
 
@@ -643,7 +643,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 							$optionkey = $args['settings'] . '_' . $key . '-' . $option;
 							if ( isset( $_POST[$optionkey] ) ) {
 								// 1.1.2: check for value if specified
-								if ( ( isset( $values['value'] ) && ( $values['value'] == $_POST[$optionkey] ) ) 
+								if ( ( isset( $values['value'] ) && ( $values['value'] == $_POST[$optionkey] ) )
 								  || ( !isset( $values['value'] ) && ( 'yes' == $_POST[$optionkey] ) ) ) {
 									// 1.1.0: fixed to save only array of key values
 									$posted[] = $option;
@@ -656,7 +656,6 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 
 						// -- comma separated values ---
 						// 1.0.4: added comma separated values option
-						$values = array();
 						if ( strstr( $posted, ',' ) ) {
 							$posted = explode( ',', $posted );
 						} else {
@@ -698,9 +697,9 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 					if ( $this->debug ) {
 						echo 'New Settings for Key ' . $key . ': ';
 						if ( $newsettings ) {
-							echo '(to-validate) ' . var_dump( $newsettings, true ) . '<br>';
+							echo '(to-validate) ' . print_r( $newsettings, true ) . '<br>';
 						} else {
-							echo '(validated) ' . var_dump( $settings[$key], true ) . '<br>';
+							echo '(validated) ' . print_r( $settings[$key], true ) . '<br>';
 						}
 					}
 
@@ -723,10 +722,22 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 								$settings[$key] = $newsettings;
 							}
 						} else {
+
 							// --- validate single setting ---
-							$newsetting = $this->validate_setting( $newsettings, $valid, $validate_args );
-							if ( $newsetting ) {
-								$settings[$key] = $newsetting;
+							if ( 'csv' == $type ) {
+								// 1.1.5: fix to validate each of multiple CSV values
+								$values = explode( ',', $newsettings );
+								$newvalues = array();
+								foreach ( $values as $value ) {
+									$newvalues[] = $this->validate_setting( $value, $valid, $validate_args );
+								}
+								$newsettings = implode( ',', $newvalues );
+								$settings[$key] = $newsettings;
+							} else {
+								$newsetting = $this->validate_setting( $newsettings, $valid, $validate_args );
+								if ( $newsetting ) {
+									$settings[$key] = $newsetting;
+								}
 							}
 						}
 
@@ -798,6 +809,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 		// -----------------------
 		// Validate Plugin Setting
 		// -----------------------
+		// 1.1.5: plural options now use extra validation
 		public function validate_setting( $posted, $valid, $args ) {
 
 			// --- allow for clearing of a field ---
@@ -828,7 +840,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 
 				// --- number (numeric text) ---
 				// note: step key is only used for controls, not for validation
-				// 1.0.9: cast to integer not absolute integer
+				// 1.0.9: cast to integer - not absolute integer
 				// TODO: validate step value match ?
 				$posted = floatval( trim( $posted ) );
 				if ( isset( $args['min'] ) && ( $posted < $args['min'] ) ) {
@@ -863,7 +875,6 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 				if ( !filter_var( $url, FILTER_VALIDATE_URL ) ) {
 					$posted = '';
 				}
-
 				return $posted;
 
 			} elseif ( in_array( $valid, array( 'EMAIL', 'EMAILS' ) ) ) {
@@ -876,12 +887,37 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 				} else {
 					$posted = '';
 				}
-
 				return $posted;
 
-			} elseif ( in_array( $valid, array( 'USERNAME', 'USERNAMES' ) ) ) {
+			} elseif ( in_array( $valid, array( 'USEREMAIL', 'USEREMAILS' ) ) ) {
+
+				// --- email address with user validation ---
+				// 1.1.5: added option for validated user emails
+				$email = sanitize_email( trim( $posted ) );
+				if ( !$email ) {
+					return '';
+				}
+				$user = get_user_by( 'email', $email );
+				if ( $user ) {
+					$posted = $username;
+				} else {
+					$posted = '';
+				}
+				return $posted;
+
+			} elseif ( 'USERNAME' == $valid ) {
 
 				// --- username ---
+				$username = sanitize_user( trim( $posted ) );
+				if ( !$username ) {
+					return '';
+				}
+				return $username;
+
+			} elseif ( 'USERNAMES' == $valid ) {
+
+				// --- username with check for existing user ---
+				// 1.1.5: separated check from singular
 				$username = sanitize_user( trim( $posted ) );
 				if ( !$username ) {
 					return '';
@@ -892,12 +928,20 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 				} else {
 					$posted = '';
 				}
-
 				return $posted;
 
-			} elseif ( in_array( $valid, array( 'USERID', 'USERIDS' ) ) ) {
+			} elseif ( 'USERID' == $valid ) {
 
 				// --- user ID ---
+				$userid = intval( trim( $posted ) );
+				if ( 0 === $userid ) {
+					return '';
+				}
+
+			} elseif ( 'USERIDS' == $valid ) {
+
+				// --- user ID with check for existing user ---
+				// 1.1.5: separated check from singular
 				$userid = intval( trim( $posted ) );
 				if ( 0 === $userid ) {
 					return '';
@@ -918,7 +962,15 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 
 				return $posted;
 
-			} elseif ( in_array( $valid, array( 'PAGEID', 'PAGEIDS', 'POSTID', 'POSTIDS' ) ) ) {
+			} elseif ( in_array( $valid, array( 'PAGEID', 'POSTID' ) ) ) {
+
+				$posted = intval( trim( $posted ) );
+				if ( 0 === $posted ) {
+					return '';
+				}
+				return $posted;
+
+			} elseif ( in_array( $valid, array( 'PAGEIDS', 'POSTIDS' ) ) ) {
 
 				$posted = intval( trim( $posted ) );
 				if ( 0 === $posted ) {
@@ -937,14 +989,14 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 		// Delete Settings
 		// ---------------
 		public function delete_settings() {
-		
+
 			// TODO: check for plugin settings flag to delete settings ?
 			// $delete_settings = $this->get_setting( 'delete_settings' );
 			// if ( $delete_settings ) {
 			//	$args = $this->args;
 			//	delete_option( $args['option'] );
 			// }
-			
+
 			// TODO: check for plugin settings flag to delete data?
 			// $delete_data = $this->get_setting( 'delete_data' );
 			// if ( $delete_data ) {
@@ -1376,7 +1428,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 			// 1.0.8: change from function exists check
 			// 1.0.9: change to filter usage to check if menu is manually added
 			$menu_added = apply_filters( $args['namespace'] . '_admin_menu_added', false, $args );
-			
+
 			// 1.1.1: record to admin menu added switch
 			$this->menu_added = $menu_added;
 
@@ -1391,7 +1443,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 			// 1.1.0: add admin notices boxer
 			add_action( 'all_admin_notices', array( $this, 'notice_boxer' ), 999 );
 		}
-		
+
 		// -----------------
 		// Plugin Page Links
 		// -----------------
@@ -1401,7 +1453,7 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 			if ( plugin_basename( $args['file'] ) == $file ) {
 
 				// --- add settings link ---
-				// 1.1.1: fix to settings page link URL 
+				// 1.1.1: fix to settings page link URL
 				// (depending on whether top level menu or Settings submenu item)
 				$page = 'options-general.php';
 				if ( $this->menu_added ) {$page = 'admin.php';}
@@ -1483,9 +1535,9 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 				} else {
 					document.getElementById('admin-notices-wrap').style.display = '';
 					document.getElementById('admin-notices-arrow').innerHTML= '&#9662;';
-				} 
+				}
 			} ";
-			
+
 			// --- modified from /wp-admin/js/common.js to move notices ---
 			echo "jQuery(document).ready(function() {
 				setTimeout(function() {
@@ -1765,12 +1817,12 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 			$args = $this->args;
 			$namespace = $this->namespace;
 			$options = $this->options;
-			
+
 			// --- get plugin options and default settings ---
 			// 1.1.2: fix for filtering of plugin options
 			$options = $this->options;
 			$options = apply_filters( $namespace . '_options', $options );
-		
+
 			$defaults = $this->default_settings();
 			$settings = $this->get_settings( false );
 
@@ -2497,10 +2549,10 @@ if ( !class_exists( 'radio_station_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'radio_station_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'PREFIX_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
-	function radio_station_load_prefixed_functions() {
+if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
+	function PREFIX_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -2509,8 +2561,8 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'radio_station_get_radio_station_slug' ) ) {
-			function radio_station_get_radio_station_slug( $f ) {
+		if ( !function_exists( 'PREFIX_get_PREFIX_slug' ) ) {
+			function PREFIX_get_PREFIX_slug( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -2519,9 +2571,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'radio_station_loader_instance' ) ) {
-			function radio_station_loader_instance() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_loader_instance' ) ) {
+			function PREFIX_loader_instance() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
@@ -2531,9 +2583,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Get Freemius Instance
 		// ---------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'radio_station_freemius_instance' ) ) {
-			function radio_station_freemius_instance() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_freemius_instance' ) ) {
+			function PREFIX_freemius_instance() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -2543,9 +2595,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Get Plugin Data
 		// ---------------
 		// 1.1.1: added function for getting plugin data
-		if ( !function_exists( 'radio_station_plugin_data' ) ) {
-			function radio_station_plugin_data() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_plugin_data' ) ) {
+			function PREFIX_plugin_data() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
@@ -2556,9 +2608,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Get Plugin Version
 		// ------------------
 		// 1.1.2: added function for getting plugin version
-		if ( !function_exists( 'radio_station_plugin_version' ) ) {
-			function radio_station_plugin_version() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_plugin_version' ) ) {
+			function PREFIX_plugin_version() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_version();
@@ -2568,9 +2620,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// -----------------
 		// Set Pro Namespace
 		// -----------------
-		if ( !function_exists( 'radio_station_pro_namespace' ) ) {
-			function radio_station_pro_namespace( $pronamespace ) {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_pro_namespace' ) ) {
+			function PREFIX_pro_namespace( $pronamespace ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->pro_namespace( $pronamespace );
 			}
@@ -2583,9 +2635,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'radio_station_add_settings' ) ) {
-			function radio_station_add_settings() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_add_settings' ) ) {
+			function PREFIX_add_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -2594,9 +2646,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'radio_station_default_settings' ) ) {
-			function radio_station_default_settings( $key = false ) {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_default_settings' ) ) {
+			function PREFIX_default_settings( $key = false ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -2606,9 +2658,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'radio_station_get_options' ) ) {
-			function radio_station_get_options() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_get_options' ) ) {
+			function PREFIX_get_options() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -2618,9 +2670,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'radio_station_get_setting' ) ) {
-			function radio_station_get_setting( $key, $filter = true ) {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_get_setting' ) ) {
+			function PREFIX_get_setting( $key, $filter = true ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -2631,9 +2683,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'radio_station_get_settings' ) ) {
-			function radio_station_get_settings( $filter = true ) {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_get_settings' ) ) {
+			function PREFIX_get_settings( $filter = true ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -2643,9 +2695,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'radio_station_reset_settings' ) ) {
-			function radio_station_reset_settings() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_reset_settings' ) ) {
+			function PREFIX_reset_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -2654,9 +2706,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'radio_station_update_settings' ) ) {
-			function radio_station_update_settings() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_update_settings' ) ) {
+			function PREFIX_update_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -2665,22 +2717,22 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'radio_station_delete_settings' ) ) {
-			function radio_station_delete_settings() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_delete_settings' ) ) {
+			function PREFIX_delete_settings() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
 		}
-		
-		
+
+
 
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'radio_station_message_box' ) ) {
-			function radio_station_message_box( $message, $echo = false ) {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_message_box' ) ) {
+			function PREFIX_message_box( $message, $echo = false ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -2690,9 +2742,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'radio_station_settings_header' ) ) {
-			function radio_station_settings_header() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_header' ) ) {
+			function PREFIX_settings_header() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -2701,9 +2753,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'radio_station_settings_page' ) ) {
-			function radio_station_settings_page() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_page' ) ) {
+			function PREFIX_settings_page() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -2713,9 +2765,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'radio_station_settings_table' ) ) {
-			function radio_station_settings_table() {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_table' ) ) {
+			function PREFIX_settings_table() {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -2725,9 +2777,9 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'radio_station_settings_row' ) ) {
-			function radio_station_settings_row( $option, $setting ) {
-				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
+		if ( !function_exists( 'PREFIX_settings_row' ) ) {
+			function PREFIX_settings_row( $option, $setting ) {
+				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -2788,7 +2840,11 @@ if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
 // CHANGELOG
 // =========
 
+// == 1.1.5 ==
+// - fix to validate multiple CSV values
+
 // == 1.1.4 ==
+// - fix for debug prefix key dash
 // - fix for weird get_settings glitch bug (isset failing?!)
 
 // == 1.1.3 ==
