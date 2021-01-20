@@ -5,14 +5,14 @@
 // ===========================
 //
 // --------------
-// Version: 1.1.5
+// Version: 1.1.6
 // --------------
 // Note: Changelog and structure at end of file.
 //
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of PREFIX_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of PLUGIN_PANEL_ in this file with the plugin namespace prefix eg. my_plugin_
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -88,16 +88,16 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new PREFIX_loader($args);				// instantiates loader class
-// (ie. search and replace 'PREFIX_' with 'my_plugin_' function namespace)
+// $instance = new PLUGIN_PANEL_loader($args);				// instantiates loader class
+// (ie. search and replace 'PLUGIN_PANEL_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'PREFIX_loader' ) ) {
-	class PREFIX_loader {
+if ( !class_exists( '`PLUGIN_PANEL_loader' ) ) {
+	class PLUGIN_PANEL_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -721,6 +721,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							} else {
 								$settings[$key] = $newsettings;
 							}
+
 						} else {
 
 							// --- validate single setting ---
@@ -863,6 +864,25 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					return $posted;
 				}
 
+			} elseif ( 'PHONE' == $valid ) {
+
+				// --- phone number characters only ---
+				$posted = trim( $posted );
+				// $checkposted = preg_match( '/^[0-9+\(\)#\.\s\-]+$/', $posted );
+				// if ( $checkposted ) {
+				//	return $posted;
+				// }
+				if ( strlen( $posted ) > 0 ) {
+					$posted = str_split( $posted, 1 );
+					$posted = preg_filter( '/^[0-9+\(\)#\.\s\-]+$/', '$0', $posted );
+					if ( count( $posted ) > 0 ) {
+						$posted = implode( '', $posted );
+						return $posted;
+					} else {
+						return '';
+					}
+				}
+
 			} elseif ( in_array( $valid, array( 'URL', 'URLS' ) ) ) {
 
 				// --- URL address ---
@@ -982,6 +1002,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				}
 			}
 
+			// TODO: return validation error ?
 			return false;
 		}
 
@@ -2549,10 +2570,10 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'PREFIX_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'PLUGIN_PANEL_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
-	function PREFIX_load_prefixed_functions() {
+if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
+	function PLUGIN_PANEL_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -2561,8 +2582,8 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'PREFIX_get_PREFIX_slug' ) ) {
-			function PREFIX_get_PREFIX_slug( $f ) {
+		if ( !function_exists( 'PLUGIN_PANEL_get_PLUGIN_PANEL_slug' ) ) {
+			function PLUGIN_PANEL_get_PLUGIN_PANEL_slug( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -2571,9 +2592,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'PREFIX_loader_instance' ) ) {
-			function PREFIX_loader_instance() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_loader_instance' ) ) {
+			function PLUGIN_PANEL_loader_instance() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
@@ -2583,9 +2604,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Freemius Instance
 		// ---------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'PREFIX_freemius_instance' ) ) {
-			function PREFIX_freemius_instance() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_freemius_instance' ) ) {
+			function PLUGIN_PANEL_freemius_instance() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -2595,9 +2616,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Plugin Data
 		// ---------------
 		// 1.1.1: added function for getting plugin data
-		if ( !function_exists( 'PREFIX_plugin_data' ) ) {
-			function PREFIX_plugin_data() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_plugin_data' ) ) {
+			function PLUGIN_PANEL_plugin_data() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
@@ -2608,9 +2629,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Plugin Version
 		// ------------------
 		// 1.1.2: added function for getting plugin version
-		if ( !function_exists( 'PREFIX_plugin_version' ) ) {
-			function PREFIX_plugin_version() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_plugin_version' ) ) {
+			function PLUGIN_PANEL_plugin_version() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_version();
@@ -2620,9 +2641,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------------
 		// Set Pro Namespace
 		// -----------------
-		if ( !function_exists( 'PREFIX_pro_namespace' ) ) {
-			function PREFIX_pro_namespace( $pronamespace ) {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_pro_namespace' ) ) {
+			function PLUGIN_PANEL_pro_namespace( $pronamespace ) {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->pro_namespace( $pronamespace );
 			}
@@ -2635,9 +2656,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'PREFIX_add_settings' ) ) {
-			function PREFIX_add_settings() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_add_settings' ) ) {
+			function PLUGIN_PANEL_add_settings() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -2646,9 +2667,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'PREFIX_default_settings' ) ) {
-			function PREFIX_default_settings( $key = false ) {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_default_settings' ) ) {
+			function PLUGIN_PANEL_default_settings( $key = false ) {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -2658,9 +2679,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'PREFIX_get_options' ) ) {
-			function PREFIX_get_options() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_get_options' ) ) {
+			function PLUGIN_PANEL_get_options() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -2670,9 +2691,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'PREFIX_get_setting' ) ) {
-			function PREFIX_get_setting( $key, $filter = true ) {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_get_setting' ) ) {
+			function PLUGIN_PANEL_get_setting( $key, $filter = true ) {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -2683,9 +2704,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'PREFIX_get_settings' ) ) {
-			function PREFIX_get_settings( $filter = true ) {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_get_settings' ) ) {
+			function PLUGIN_PANEL_get_settings( $filter = true ) {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -2695,9 +2716,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'PREFIX_reset_settings' ) ) {
-			function PREFIX_reset_settings() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_reset_settings' ) ) {
+			function PLUGIN_PANEL_reset_settings() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -2706,9 +2727,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'PREFIX_update_settings' ) ) {
-			function PREFIX_update_settings() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_update_settings' ) ) {
+			function PLUGIN_PANEL_update_settings() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -2717,9 +2738,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'PREFIX_delete_settings' ) ) {
-			function PREFIX_delete_settings() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_delete_settings' ) ) {
+			function PLUGIN_PANEL_delete_settings() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
@@ -2730,9 +2751,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'PREFIX_message_box' ) ) {
-			function PREFIX_message_box( $message, $echo = false ) {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_message_box' ) ) {
+			function PLUGIN_PANEL_message_box( $message, $echo = false ) {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -2742,9 +2763,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'PREFIX_settings_header' ) ) {
-			function PREFIX_settings_header() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_settings_header' ) ) {
+			function PLUGIN_PANEL_settings_header() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -2753,9 +2774,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'PREFIX_settings_page' ) ) {
-			function PREFIX_settings_page() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_settings_page' ) ) {
+			function PLUGIN_PANEL_settings_page() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -2765,9 +2786,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'PREFIX_settings_table' ) ) {
-			function PREFIX_settings_table() {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_settings_table' ) ) {
+			function PLUGIN_PANEL_settings_table() {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -2777,9 +2798,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'PREFIX_settings_row' ) ) {
-			function PREFIX_settings_row( $option, $setting ) {
-				$namespace = PREFIX_get_PREFIX_slug( __FUNCTION__ );
+		if ( !function_exists( 'PLUGIN_PANEL_settings_row' ) ) {
+			function PLUGIN_PANEL_settings_row( $option, $setting ) {
+				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -2839,6 +2860,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 // =========
 // CHANGELOG
 // =========
+
+// == 1.1.6 ==
+// - added phone number character validation
 
 // == 1.1.5 ==
 // - fix to validate multiple CSV values
