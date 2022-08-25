@@ -5,14 +5,14 @@
 // ===========================
 //
 // --------------
-// Version: 1.1.8
+// Version: 1.1.9
 // --------------
 // Note: Changelog and structure at end of file.
 //
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of PLUGIN_PANEL_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of radio_station_ in this file with the plugin namespace prefix eg. my_plugin_
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -88,16 +88,16 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new PLUGIN_PANEL_loader($args);				// instantiates loader class
-// (ie. search and replace 'PLUGIN_PANEL_' with 'my_plugin_' function namespace)
+// $instance = new radio_station_loader($args);				// instantiates loader class
+// (ie. search and replace 'radio_station_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
-	class PLUGIN_PANEL_loader {
+if ( !class_exists( 'radio_station_loader' ) ) {
+	class radio_station_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -149,6 +149,8 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			unset( $args['options'] );
 
 			// --- set plugin args and namespace ---
+			// 1.1.9: filter all arguments 
+			$args = apply_filters( $args['namespace'] . '_args', $args );
 			$this->args = $args;
 			$this->namespace = $args['namespace'];
 
@@ -714,7 +716,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 
 					if ( $this->debug ) {
 						echo 'New Settings for Key ' . $key . ': ';
-						if ( $newsettings ) {
+						if ( $newsetting || ( 0 === $newsetting ) || ( '0' === $newsetting ) ) {
 							echo '(to-validate) ' . print_r( $newsettings, true ) . '<br>';
 						} else {
 							// 1.1.7 handle if (new) key not set yet
@@ -727,13 +729,20 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					}
 
 					// --- maybe validate new settings ---
-					if ( $newsettings ) {
+					// 1.1.9: fix to allow saving of zero value
+					if ( $newsettings || ( 0 === $newsettings ) || ( '0' === $newsettings ) ) {
 						if ( is_array( $newsettings ) ) {
 
 							// --- validate array of settings ---
+							// 1.1.9: fix to allow saving of zero value
 							foreach ( $newsettings as $newkey => $newvalue ) {
 								$newsetting = $this->validate_setting( $newvalue, $valid, $validate_args );
+								if ( $this->debug ) {
+									echo 'Validated Setting array value ' . $newvalue . ' to ' . $newsetting;
+								}
 								if ( $newsetting && ( '' != $newsetting ) ) {
+									$newsettings[$newkey] = $newsetting;
+								} elseif ( ( 0 == $newsetting ) || ( '0' == $newsetting ) ) {
 									$newsettings[$newkey] = $newsetting;
 								} else {
 									unset( $newsettings[$newkey] );
@@ -753,13 +762,21 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 								$values = explode( ',', $newsettings );
 								$newvalues = array();
 								foreach ( $values as $value ) {
-									$newvalues[] = $this->validate_setting( $value, $valid, $validate_args );
+									$newvalue = $this->validate_setting( $value, $valid, $validate_args );
+									$newvalues[] = $newvalue;
+									if ( $this->debug ) {
+										echo 'Validated Setting value ' . $value . ' to ' . $newvalue;
+									}
 								}
 								$newsettings = implode( ',', $newvalues );
 								$settings[$key] = $newsettings;
 							} else {
 								$newsetting = $this->validate_setting( $newsettings, $valid, $validate_args );
-								if ( $newsetting ) {
+								// 1.1.9: fix to allow saving of zero value
+								if ( $this->debug ) {
+									echo 'Validated Setting single value ' . $newsettings . ' to ' . $newsetting;
+								}
+								if ( $newsetting || ( 0 == $newsetting ) || ( '0' == $newsetting ) ) {
 									$settings[$key] = $newsetting;
 								}
 							}
@@ -1390,8 +1407,8 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 						'support'    => $args['support'],
 						'account'    => $args['account'],
 					),
-				);
-
+				);		
+				
 				// --- maybe add plugin submenu to parent menu ---
 				if ( isset( $args['parentmenu'] ) ) {
 					$settings['menu']['parent'] = array( 'slug' => $args['parentmenu'] );
@@ -1414,6 +1431,9 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 
 				// --- add Freemius connect message filter ---
 				$this->freemius_connect();
+				
+				// --- fire Freemius loaded action ---
+				do_action( $args['namespace'] . '_loaded' );
 			}
 		}
 
@@ -1479,6 +1499,9 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			if ( !isset( $args['menutitle'] ) ) {
 				$args['menutitle'] = $args['title'];
 			}
+			// 1.1.9: added filters for page and menu titles
+			$pagetitle = apply_filters( $namespace . '_settings_page_title', $args['pagetitle'] );
+			$menutitle = apply_filters( $namespace . '_settings_menu_title', $args['menutitle'] );
 
 			// --- trigger filter plugin menu action ---
 			// (can hook into this to add an admin menu manually using the provided loader args)
@@ -1619,16 +1642,16 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 
 			// --- output debug values ---
 			if ( $this->debug ) {
-				echo "<br><b>Current Settings:</b><br>";
+				echo '<br><b>Current Settings:</b><br>';
 				print_r( $settings );
-				echo "<br><br>";
+				echo '<br><br>';
 
-				echo "<br><b>Plugin Options:</b><br>";
+				echo '<br><b>Plugin Options:</b><br>';
 				print_r( $this->options );
-				echo "<br><br>";
+				echo '<br><br>';
 
 				if ( isset( $_POST ) ) {
-					echo "<br><b>Posted Values:</b><br>";
+					echo '<br><b>Posted Values:</b><br>';
 					foreach ( $_POST as $key => $value ) {
 						echo esc_attr( $key ) . ': ' . print_r( $value, true ) . '<br>';
 					}
@@ -1661,38 +1684,53 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			.readme:hover {text-decoration:underline;}</style>";
 
 			// --- open header table ---
-			echo "<table><tr>";
+			echo '<table class="plugin-settings-page-header"><tr>';
 
 			// --- plugin icon ---
-			echo "<td>";
-			if ( $icon_url ) {
-				echo "<img src='" . esc_url( $icon_url ) . "' width='128' height='128'>";
+			// 1.1.9: add filter for plugin icon url
+			$icon_url = apply_filters( $namespace . '_settings_page_icon_url', $icon_url );
+			echo '<td>';
+			if ( $icon_url ) {				
+				echo '<img class="plugin-settings-page-icon" src="' . esc_url( $icon_url ) . '" width="128" height="128">';
 			}
-			echo "</td>";
+			echo '</td>';
 
-			echo "<td width='20'></td><td>";
+			echo '<td width="20"></td><td>';
 
-			echo "<table><tr>";
+			echo '<table><tr>';
 
 			// --- plugin title ---
-			echo "<td><h3 style='font-size:20px;'>";
-			echo "<a href='" . esc_url( $args['home'] ) . "' target='_blank' style='text-decoration:none;'>" . esc_html( $args['title'] ) . "</a>";
-			echo "</h3></td>";
+			// 1.1.9: add filter for plugin pagetitle
+			$title = apply_filters( $namespace . '_settings_page_title', $args['title'] );
+			echo '<td><h3 style="font-size:20px;">';
+			echo '<a href="' . esc_url( $args['home'] ) . '" target="_blank" style="text-decoration:none;">' . esc_html( $title ) . '</a>';
+			echo '</h3></td>';
 
-			echo "<td width='20'></td>";
+			echo '<td width="20"></td>';
 
 			// --- plugin version ---
-			echo "<td><h3>v" . esc_html( $args['version'] ) . "</h3></td></tr>";
+			// 1.1.9: add filter for plugin version
+			$version = apply_filters( $namespace . '_settings_page_version', 'v' . $args['version'] );
+			echo '<td><h3 class="plugin-setttings-page-version">' . esc_html( $version ) . '</h3></td></tr>';
 
-			echo "<tr><td colspan='3' align='center'>";
+			// --- subtitle ---
+			// 1.1.9: added optional subtitle filter display
+			$subtitle = apply_filters( $namespace . '_settings_page_subtitle', '' );
+			if ( '' != $subtitle ) { 
+				echo '<tr><td colspan="3" align="center">';
+				echo '<h4 class="plugins-settings-page-subtitle" style="font-size:14px; margin-top:0;">' . esc_html( $subtitle ) . '</h4>';
+				echo '</td></tr>';
+			}
 
-			echo "<table><tr><td align='center'>";
+			echo '<tr><td colspan="3" align="center">';
+
+			echo '<table><tr><td align="center">';
 
 			// ---- plugin author ---
 			// 1.0.8: check if author URL is set
 			if ( isset( $args['author_url'] ) ) {
-				echo "<font style='font-size:16px;'>" . esc_html( __( 'by' ) ) . "</font> ";
-				echo "<a href='" . esc_url( $args['author_url'] ) . "' target='_blank' style='text-decoration:none;font-size:16px;' target=_blank><b>" . esc_html( $args['author'] ) . "</b></a><br><br>";
+				echo '<font style="font-size:16px;">' . esc_html( __( 'by' ) ) . '</font> ';
+				echo '<a href="' . esc_url( $args['author_url'] ) . '" target="_blank" style="text-decoration:none;font-size:16px;" target="_blank"><b>' . esc_html( $args['author'] ) . '</b></a><br><br>';
 			}
 
 			// --- readme / docs / support links ---
@@ -1701,20 +1739,20 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			// 1.1.0: added title attributes to links
 			$links = array();
 			if ( isset( $args['home'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['home'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Homepage' ) ) . "' target='_blank'><b>" . esc_html( __( 'Home' ) ) . "</b></a>";
+				$links[] = '<a href="' . esc_url( $args['home'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Homepage' ) ) . '" target="_blank"><b>' . esc_html( __( 'Home' ) ) . '</b></a>';
 			}
 			if ( !isset( $args['readme'] ) || ( false !== $args['readme'] ) ) {
 				$readme_url = add_query_arg( 'action', $namespace . '_readme_viewer', admin_url( 'admin-ajax.php' ) );
-				$links[] = "<a href='" . esc_url( $readme_url ) . "' class='pluginlink smalllink thickbox' title='" . esc_attr( __( 'View Plugin' ) ) . " readme.txt'><b>" . esc_html( __( 'Readme' ) ) . "</b></a>";
+				$links[] = '<a href="' . esc_url( $readme_url ) . '" class="pluginlink smalllink thickbox" title="' . esc_attr( __( 'View Plugin' ) ) . ' readme.txt"><b>' . esc_html( __( 'Readme' ) ) . '</b></a>';
 			}
 			if ( isset( $args['docs'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['docs'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Documentation' ) ) . "' target='_blank'><b>" . esc_html( __( 'Docs' ) ) . "</b></a>";
+				$links[] = '<a href="' . esc_url( $args['docs'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Documentation' ) ) . '" target="_blank"><b>' . esc_html( __( 'Docs' ) ) . '</b></a>';
 			}
 			if ( isset( $args['support'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['support'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Support' ) ) . "' target='_blank'><b>" . esc_html( __( 'Support' ) ) . "</b></a>";
+				$links[] = '<a href="' . esc_url( $args['support'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Support' ) ) . '" target="_blank"><b>' . esc_html( __( 'Support' ) ) . '</b></a>';
 			}
 			if ( isset( $args['development'] ) ) {
-				$links[] = "<a href='" . esc_url( $args['development'] ) . "' class='pluginlink smalllink' title='" . esc_attr( __( 'Plugin Development' ) ) . "' target='_blank'><b>" . esc_html( __( 'Dev' ) ) . "</b></a>";
+				$links[] = '<a href="' . esc_url( $args['development'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Development' ) ) . '" target="_blank"><b>' . esc_html( __( 'Dev' ) ) . '</b></a>';
 			}
 
 			// 1.0.9: change filter from _plugin_links to disambiguate
@@ -1726,28 +1764,28 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 
 			// --- author icon ---
 			if ( $author_icon_url ) {
-				echo "</td><td>";
+				echo '</td><td>';
 
 				// 1.0.8: check if author URL is set for link
 				if ( isset( $args['author_url'] ) ) {
-					echo "<a href='" . esc_url( $args['author_url'] ) . "' target=_blank>";
+					echo '<a href="' . esc_url( $args['author_url'] ) . '" target="_blank">';
 				}
-				echo "<img src='" . esc_url( $author_icon_url ) . "' width='64' height='64' border='0'>";
+				echo '<img src="' . esc_url( $author_icon_url ) . '" width="64" height="64" border="0">';
 				if ( isset( $args['author_url'] ) ) {
-					echo "</a>";
+					echo '</a>';
 				}
 			}
 
-			echo "</td></tr></table>";
+			echo '</td></tr></table>';
 
-			echo "</td></tr></table>";
+			echo '</td></tr></table>';
 
-			echo "</td><td width='50'></td><td style='vertical-align:top;'>";
+			echo '</td><td width="50"></td><td style="vertical-align:top;">';
 
 			// --- plugin supporter links ---
 			// 1.0.1: set rate/share/donate links and texts
 			// 1.0.8: added filters for rate/share/donate links
-			echo "<br>";
+			echo '<br><div class="plugin-settings-page-links">';
 
 			// --- Rate link ---
 			if ( isset( $args['wporgslug'] ) ) {
@@ -1763,9 +1801,9 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				} else {
 					$rate_text = __( 'Rate on WordPress.Org' );
 				}
-				$rate_link = "<a href='" . esc_url( $rate_url ) . "' class='pluginlink' target='_blank'>";
-				$rate_link .= "<span style='font-size:24px; color:#FC5; margin-right:10px;' class='dashicons dashicons-star-filled'></span> ";
-				$rate_link .= esc_html( $rate_text ) . "</a><br><br>";
+				$rate_link = '<a href="' . esc_url( $rate_url ) . '" class="pluginlink" target="_blank">';
+				$rate_link .= '<span style="font-size:24px; color:#FC5; margin-right:10px;" class="dashicons dashicons-star-filled"></span> ';
+				$rate_link .= esc_html( $rate_text ) . '</a><br><br>';
 				$rate_link = apply_filters( $args['namespace'] . '_rate_link', $rate_link, $args );
 				if ( $rate_link ) {
 					// phpcs:ignore WordPress.Security.OutputNotEscaped
@@ -1780,9 +1818,9 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				} else {
 					$share_text = __( 'Share the Plugin Love' );
 				}
-				$share_link = "<a href='" . esc_url( $args['share'] ) . "' class='pluginlink' target='_blank'>";
-				$share_link .= "<span style='font-size:24px; color:#E0E; margin-right:10px;' class='dashicons dashicons-share'></span> ";
-				$share_link .= esc_html( $share_text ) . "</a><br><br>";
+				$share_link = '<a href="' . esc_url( $args['share'] ) . '" class="pluginlink" target="_blank">';
+				$share_link .= '<span style="font-size:24px; color:#E0E; margin-right:10px;" class="dashicons dashicons-share"></span> ';
+				$share_link .= esc_html( $share_text ) . '</a><br><br>';
 				$share_link = apply_filters( $args['namespace'] . '_share_link', $share_link, $args );
 				if ( $share_link ) {
 					// phpcs:ignore WordPress.Security.OutputNotEscaped
@@ -1797,9 +1835,9 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				} else {
 					$donate_text = __( 'Support this Plugin' );
 				}
-				$donate_link = "<a href='" . esc_url( $args['donate'] ) . "' class='pluginlink' target='_blank'>";
-				$donate_link .= "<span style='font-size:24px; color:#E00; margin-right:10px;' class='dashicons dashicons-heart'></span> ";
-				$donate_link .= "<b>" . esc_html( $donate_text ) . "</b></a><br><br>";
+				$donate_link = '<a href="' . esc_url( $args['donate'] ) . '" class="pluginlink" target="_blank">';
+				$donate_link .= '<span style="font-size:24px; color:#E00; margin-right:10px;" class="dashicons dashicons-heart"></span> ';
+				$donate_link .= '<b>' . esc_html( $donate_text ) . '</b></a><br><br>';
 				$donate_link = apply_filters( $args['namespace'] . '_donate_link', $donate_link, $args );
 				if ( $donate_link ) {
 					// phpcs:ignore WordPress.Security.OutputNotEscaped
@@ -1807,7 +1845,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				}
 			}
 
-			echo "</td></tr>";
+			echo '</div></td></tr>';
 
 			// --- output updated and reset messages ---
 			if ( isset( $_GET['updated'] ) ) {
@@ -1819,23 +1857,23 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					$message = $settings['title'] . ' ' . __( 'Settings Reset!' );
 				}
 				if ( isset( $message ) ) {
-					echo "<tr><td></td><td></td><td align='center'>";
+					echo '<tr><td></td><td></td><td align="center">';
 					// phpcs:ignore WordPress.Security.OutputNotEscaped
 					echo $this->message_box( $message, false );
-					echo "</td></tr>";
+					echo '</td></tr>';
 				}
 			} else {
 				// --- maybe output welcome message ---
 				if ( isset( $_REQUEST['welcome'] ) && ( 'true' == $_REQUEST['welcome'] ) ) {
 					if ( isset( $args['welcome'] ) ) {
-						echo "<tr><td colspan='3' align='center'>";
+						echo '<tr><td colspan="3" align="center">';
 						echo $this->message_box( $args['welcome'], false );
-						echo "</td></tr>";
+						echo '</td></tr>';
 					}
 				}
 			}
 
-			echo "</table><br>";
+			echo '</table><br>';
 		}
 
 		// -------------
@@ -1846,7 +1884,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			$namespace = $this->namespace;
 
 			// --- open page wrapper ---
-			echo "<div id='pagewrap' class='wrap' style='width:100%;margin-right:0px !important;'>";
+			echo '<div id="pagewrap" class="wrap" style="width:100%;margin-right:0px !important;">';
 
 			do_action( $namespace . '_admin_page_top' );
 
@@ -1861,7 +1899,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			do_action( $namespace . '_admin_page_bottom' );
 
 			// --- close page wrapper ---
-			echo "</div>";
+			echo '</div>';
 		}
 
 		// --------------
@@ -2765,10 +2803,10 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'PLUGIN_PANEL_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'radio_station_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
-	function PLUGIN_PANEL_load_prefixed_functions() {
+if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
+	function radio_station_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -2777,8 +2815,8 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'PLUGIN_PANEL_get_PLUGIN_PANEL_slug' ) ) {
-			function PLUGIN_PANEL_get_PLUGIN_PANEL_slug( $f ) {
+		if ( !function_exists( 'radio_station_get_radio_station_slug' ) ) {
+			function radio_station_get_radio_station_slug( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -2787,9 +2825,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'PLUGIN_PANEL_loader_instance' ) ) {
-			function PLUGIN_PANEL_loader_instance() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_loader_instance' ) ) {
+			function radio_station_loader_instance() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
@@ -2799,9 +2837,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Freemius Instance
 		// ---------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'PLUGIN_PANEL_freemius_instance' ) ) {
-			function PLUGIN_PANEL_freemius_instance() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_freemius_instance' ) ) {
+			function radio_station_freemius_instance() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -2811,9 +2849,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Plugin Data
 		// ---------------
 		// 1.1.1: added function for getting plugin data
-		if ( !function_exists( 'PLUGIN_PANEL_plugin_data' ) ) {
-			function PLUGIN_PANEL_plugin_data() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_plugin_data' ) ) {
+			function radio_station_plugin_data() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
@@ -2824,9 +2862,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Plugin Version
 		// ------------------
 		// 1.1.2: added function for getting plugin version
-		if ( !function_exists( 'PLUGIN_PANEL_plugin_version' ) ) {
-			function PLUGIN_PANEL_plugin_version() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_plugin_version' ) ) {
+			function radio_station_plugin_version() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_version();
@@ -2836,9 +2874,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------------
 		// Set Pro Namespace
 		// -----------------
-		if ( !function_exists( 'PLUGIN_PANEL_pro_namespace' ) ) {
-			function PLUGIN_PANEL_pro_namespace( $pronamespace ) {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_pro_namespace' ) ) {
+			function radio_station_pro_namespace( $pronamespace ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->pro_namespace( $pronamespace );
 			}
@@ -2851,9 +2889,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'PLUGIN_PANEL_add_settings' ) ) {
-			function PLUGIN_PANEL_add_settings() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_add_settings' ) ) {
+			function radio_station_add_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -2862,9 +2900,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'PLUGIN_PANEL_default_settings' ) ) {
-			function PLUGIN_PANEL_default_settings( $key = false ) {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_default_settings' ) ) {
+			function radio_station_default_settings( $key = false ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -2874,9 +2912,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'PLUGIN_PANEL_get_options' ) ) {
-			function PLUGIN_PANEL_get_options() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_options' ) ) {
+			function radio_station_get_options() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -2886,9 +2924,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'PLUGIN_PANEL_get_setting' ) ) {
-			function PLUGIN_PANEL_get_setting( $key, $filter = true ) {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_setting' ) ) {
+			function radio_station_get_setting( $key, $filter = true ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -2899,9 +2937,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'PLUGIN_PANEL_get_settings' ) ) {
-			function PLUGIN_PANEL_get_settings( $filter = true ) {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_settings' ) ) {
+			function radio_station_get_settings( $filter = true ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -2911,9 +2949,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'PLUGIN_PANEL_reset_settings' ) ) {
-			function PLUGIN_PANEL_reset_settings() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_reset_settings' ) ) {
+			function radio_station_reset_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -2922,9 +2960,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'PLUGIN_PANEL_update_settings' ) ) {
-			function PLUGIN_PANEL_update_settings() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_update_settings' ) ) {
+			function radio_station_update_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -2933,9 +2971,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'PLUGIN_PANEL_delete_settings' ) ) {
-			function PLUGIN_PANEL_delete_settings() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_delete_settings' ) ) {
+			function radio_station_delete_settings() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
@@ -2946,9 +2984,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'PLUGIN_PANEL_message_box' ) ) {
-			function PLUGIN_PANEL_message_box( $message, $echo = false ) {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_message_box' ) ) {
+			function radio_station_message_box( $message, $echo = false ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -2958,9 +2996,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'PLUGIN_PANEL_settings_header' ) ) {
-			function PLUGIN_PANEL_settings_header() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_header' ) ) {
+			function radio_station_settings_header() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -2969,9 +3007,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'PLUGIN_PANEL_settings_page' ) ) {
-			function PLUGIN_PANEL_settings_page() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_page' ) ) {
+			function radio_station_settings_page() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -2981,9 +3019,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'PLUGIN_PANEL_settings_table' ) ) {
-			function PLUGIN_PANEL_settings_table() {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_table' ) ) {
+			function radio_station_settings_table() {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -2993,9 +3031,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'PLUGIN_PANEL_settings_row' ) ) {
-			function PLUGIN_PANEL_settings_row( $option, $setting ) {
-				$namespace = PLUGIN_PANEL_get_PLUGIN_PANEL_slug( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_row' ) ) {
+			function radio_station_settings_row( $option, $setting ) {
+				$namespace = radio_station_get_radio_station_slug( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -3055,6 +3093,10 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 // =========
 // CHANGELOG
 // =========
+
+// == 1.1.9 ==
+// - fix to allow saving of zero value
+// - added filters for plugin page settings header sections
 
 // == 1.1.8 ==
 // - fix to number step if no min or max value
