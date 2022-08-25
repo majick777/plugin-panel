@@ -5,14 +5,14 @@
 // ===========================
 //
 // --------------
-// Version: 1.2.0
+// Version: 1.2.1
 // --------------
 // Note: Changelog and structure at end of file.
 //
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of PLUGIN_PANEL_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of radio_station_ in this file with the plugin namespace prefix eg. my_plugin_
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -88,16 +88,16 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new PLUGIN_PANEL_loader($args);				// instantiates loader class
-// (ie. search and replace 'PLUGIN_PANEL_' with 'my_plugin_' function namespace)
+// $instance = new radio_station_loader($args);				// instantiates loader class
+// (ie. search and replace 'radio_station_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
-	class PLUGIN_PANEL_loader {
+if ( !class_exists( 'radio_station_loader' ) ) {
+	class radio_station_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -224,7 +224,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					$profiles = explode( ',', $proslug );
 					$proslug = trim( $profiles[0] );
 				}
-				$args['proslug'] = substr( $proslug, 0, - 4 );    // strips .php extension
+				$args['proslug'] = substr( $proslug, 0, - 4 ); // strips .php extension
 				$args['profiles'] = $profiles;
 			}
 
@@ -332,7 +332,8 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			}
 
 			// 1.0.9: trigger add settings action
-			do_action( $args['nsmespace'] . '_add_settings', $args );
+			// 1.2.1: fix to namespace typo (nsmespace)
+			do_action( $args['namespace'] . '_add_settings', $args );
 		}
 
 		// -----------------------
@@ -521,7 +522,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					if ( isset( $_POST[$postkey] ) ) {
 						$posted = $_POST[$postkey];
 					}
-					$newsettings = false;
+					$newsettings = null;
 
 					// --- maybe validate special options ---
 					// 1.0.9: check for special options to prepare
@@ -713,7 +714,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					if ( $this->debug ) {
 						echo 'New Settings for Key ' . $key . ': ';
 						// 1.2.0: added isset check for newsetting
-						if ( isset( $newsetting ) && ( $newsetting || ( 0 === $newsetting ) || ( '0' === $newsetting ) ) ) {
+						if ( !is_null( $newsettings ) ) {
 							echo '(to-validate) ' . print_r( $newsettings, true ) . '<br>';
 						} else {
 							// 1.1.7 handle if (new) key not set yet
@@ -727,17 +728,19 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 
 					// --- maybe validate new settings ---
 					// 1.1.9: fix to allow saving of zero value
-					if ( $newsettings || ( 0 === $newsettings ) || ( '0' === $newsettings ) ) {
+					// 1.2.1: fix to allow saving of empty value
+					if ( !is_null( $newsettings ) ) {
 						if ( is_array( $newsettings ) ) {
 
 							// --- validate array of settings ---
 							// 1.1.9: fix to allow saving of zero value
+							// 1.2.1: fix to allow saving of empty value
 							foreach ( $newsettings as $newkey => $newvalue ) {
 								$newsetting = $this->validate_setting( $newvalue, $valid, $validate_args );
 								if ( $this->debug ) {
 									echo 'Validated Setting array value ' . $newvalue . ' to ' . $newsetting;
 								}
-								if ( $newsetting && ( '' != $newsetting ) ) {
+								if ( $newsetting || ( '' == $newsetting ) ) {
 									$newsettings[$newkey] = $newsetting;
 								} elseif ( ( 0 == $newsetting ) || ( '0' == $newsetting ) ) {
 									$newsettings[$newkey] = $newsetting;
@@ -751,7 +754,7 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 								$settings[$key] = $newsettings;
 							}
 
-						} else {
+						} elseif ( $newsettings || ( '' == $newsettings ) || ( 0 === $newsettings ) || ( '0' === $newsettings ) ) {
 
 							// --- validate single setting ---
 							if ( 'csv' == $type ) {
@@ -770,10 +773,11 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 							} else {
 								$newsetting = $this->validate_setting( $newsettings, $valid, $validate_args );
 								// 1.1.9: fix to allow saving of zero value
+								// 1.2.1: fix to allow saving of empty value
 								if ( $this->debug ) {
-									echo 'Validated Setting single value ' . $newsettings . ' to ' . $newsetting;
+									echo 'Validated Setting single value ' . $newsettings . ' to ' . $newsetting . '<br>';
 								}
-								if ( $newsetting || ( 0 == $newsetting ) || ( '0' == $newsetting ) ) {
+								if ( $newsetting || ( '' == $newsetting ) || ( 0 == $newsetting ) || ( '0' == $newsetting ) ) {
 									$settings[$key] = $newsetting;
 								}
 							}
@@ -957,8 +961,11 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				// 1.0.6: fix to posted variable type (vposted)
 				// 1.0.9: remove check for http prefix to allow other protocols
 				// 1.1.7: use FILTER_SANITIZE_URL not FILTER_SANITIZE_STRING
+				// 1.2.1: allow for clearing URL by saving empty value
 				$posted = trim( $posted );
-				$posted = filter_var( $posted, FILTER_SANITIZE_URL );
+				if ( '' != $posted ) {
+					$posted = filter_var( $posted, FILTER_SANITIZE_URL );
+				}
 
 				// 1.1.7: remove FILTER_VALIDATE_URL check - not working!?
 				if ( $this->debug ) {
@@ -1152,6 +1159,12 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 
 			// --- AJAX readme viewer ---
 			add_action( 'wp_ajax_' . $namespace . '_readme_viewer', array( $this, 'readme_viewer' ) );
+			
+			// --- load Freemius (requires PHP 5.4+) ---
+			// 1.2.1: move Freemius loading to plugins_loaded hook
+			if ( version_compare( PHP_VERSION, '5.4.0' ) >= 0 ) {
+				add_action( 'plugins_loaded', array( $this, 'load_freemius' ) );
+			}
 		}
 
 		// ---------------------
@@ -1170,10 +1183,10 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			}
 
 			// --- Pro Functions ---
-			$plan = 'free';
 			// 1.0.2: added prototype auto-loading of Pro file(s)
+			// 1.2.1: fix overriding of plan arg to free
 			// (to work with @fs_premium_only file list)
-			if ( count( $args['profiles'] ) > 0 ) {
+			if ( isset( $args['profiles'] ) && count( $args['profiles'] ) > 0 ) {
 				$included = get_included_files();
 				foreach ( $args['profiles'] as $profile ) {
 					// --- chech for php extension ---
@@ -1189,8 +1202,11 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					}
 				}
 			}
-			$args['plan'] = $plan;
-			$this->args = $args;
+			// 1.2.0: only change plan setting if premium files found
+			if ( isset( $plan ) ) {
+				$args['plan'] = $plan;
+				$this->args = $args;
+			}
 
 			// --- Plugin Update Checker ---
 			// note: lack of updatechecker.php file indicates WordPress.Org SVN repo version
@@ -1210,10 +1226,8 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			// 1.0.9: added action for extra loader helpers (eg. WordQuest)
 			do_action( $args['namespace'] . '_loader_helpers', $args );
 
-			// --- Freemius (requires PHP 5.4+) ---
-			if ( version_compare( PHP_VERSION, '5.4.0' ) >= 0 ) {
-				$this->load_freemius();
-			}
+			// --- load Freemius (requires PHP 5.4+) ---
+			// 1.2.1: moved to plugins_loaded action hook
 
 		}
 
@@ -1331,6 +1345,11 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 		// ====================
 		public function load_freemius() {
 
+			// 1.2.1: no need to laod if not in admin area
+			if ( !is_admin() ) {
+				return;
+			}
+
 			$args = $this->args;
 			$namespace = $this->namespace;
 
@@ -1345,6 +1364,9 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 			$premium = false;
 			if ( isset( $args['plan'] ) && ( 'premium' == $args['plan'] ) ) {
 				$premium = true;
+			} else {
+				// 1.2.1: added filter for premium init
+				$premium = apply_filters( 'freemius_init_premium_' . $args['namespace'], $premium );
 			}
 
 			// --- maybe redirect link to plugin support forum ---
@@ -1357,9 +1379,10 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					// changes the support forum slug for premium based on the pro plugin file slug
 					// 1.0.7: fix support URL undefined variable warning
 					$support_url = $args['support'];
-					if ( $premium ) {
-						$support_url = str_replace( $args['slug'], $args['proslug'], $support_url );
-					}
+					// 1.2.1: removed in favour of filtering via Pro
+					// if ( $premium && isset( $args['proslug'] ) ) {
+					// 	$support_url = str_replace( $args['slug'], $args['proslug'], $support_url );
+					// }
 					$support_url = apply_filters( 'freemius_plugin_support_url_redirect', $support_url, $args['slug'] );
 					wp_redirect( $support_url );
 					exit;
@@ -1382,15 +1405,17 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				if ( !isset( $args['type'] ) ) {
 					$args['type'] = 'plugin';
 				}
-				if ( !isset( $args['hasaddons'] ) ) {
-					$args['hasaddons'] = false;
+				if ( !isset( $args['wporg'] ) ) {
+					$args['wporg'] = false;
 				}
 				if ( !isset( $args['hasplans'] ) ) {
 					$args['hasplans'] = false;
 				}
-				if ( !isset( $args['wporg'] ) ) {
-					$args['wporg'] = false;
+				if ( !isset( $args['hasaddons'] ) ) {
+					$args['hasaddons'] = false;
 				}
+				// 1.2.1: add filter for addons init
+				$args['hasaddons'] = apply_filters( 'freemius_init_addons_' . $args['namespace'], $args['hasaddons'] );
 
 				// --- set defaults for options submenu key values ---
 				// 1.0.2: fix to isset check keys
@@ -1564,24 +1589,27 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 				// --- maybe add Pro upgrade link ---
 				if ( isset( $args['hasplans'] ) && $args['hasplans'] ) {
 				
-					// -- internal upgrade link ---
-					// TODO: check if premium is already installed
-					if ( isset( $args['upgrade_link'] ) ) {
-						$upgrade_url = $args['upgrade_link'];
-						$upgrade_target = '';
-					} else {
-						$upgrade_url = add_query_arg( 'page', $args['slug'] . '-pricing', admin_url( 'admin.php' ) );
-						$upgrade_target = !strstr( $upgrade_url, '/wp-admin/' ) ? ' target="_blank"' : '';
-					}
-					$upgrade_link = "<b><a href='" . esc_url( $upgrade_url ) . "'" . $upgrade_target . ">" . esc_html( __('Upgrade' ) ) . "</a></b>";
-					array_unshift( $links, $upgrade_link );
-					
-					// --- external pro link ---
-					// 1.2.0: added pro link 
-					if ( isset( $args['pro_link'] ) ) {
-						$pro_target = !strstr( $args['pro_link'], '/wp-admin/' ) ? ' target="_blank"' : '';
-						$pro_link = "<b><a href='" . esc_url( $args['pro_link'] ) . "'" . $pro_target . ">" . esc_html( __('Pro Details' ) ) . "</a></b>";
-						array_unshift( $links, $pro_link );
+					// 1.2.1: add check if premium is already installed
+					if ( !isset( $args['plan'] ) || ( 'premium' != $args['plan'] ) ) {
+
+						// -- internal upgrade link ---
+						if ( isset( $args['upgrade_link'] ) ) {
+							$upgrade_url = $args['upgrade_link'];
+							$upgrade_target = '';
+						} else {
+							$upgrade_url = add_query_arg( 'page', $args['slug'] . '-pricing', admin_url( 'admin.php' ) );
+							$upgrade_target = !strstr( $upgrade_url, '/wp-admin/' ) ? ' target="_blank"' : '';
+						}
+						$upgrade_link = "<b><a href='" . esc_url( $upgrade_url ) . "'" . $upgrade_target . ">" . esc_html( __('Upgrade' ) ) . "</a></b>";
+						array_unshift( $links, $upgrade_link );
+
+						// --- external pro link ---
+						// 1.2.0: added separate pro details link 
+						if ( isset( $args['pro_link'] ) ) {
+							$pro_target = !strstr( $args['pro_link'], '/wp-admin/' ) ? ' target="_blank"' : '';
+							$pro_link = "<b><a href='" . esc_url( $args['pro_link'] ) . "'" . $pro_target . ">" . esc_html( __('Pro Details' ) ) . "</a></b>";
+							array_unshift( $links, $pro_link );
+						}
 					}
 				}
 
@@ -2370,10 +2398,12 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 					  || ( isset( $args['hasaddons'] ) && $args['hasaddons'] ) ) {
 						$upgrade_link = add_query_arg( 'page', $args['slug'] . '-pricing', admin_url( 'admin.php' ) );
 						$upgrade_target = '';
-					} elseif ( isset( $args['upgrade_link'] ) ) {
-						$upgrade_link = $args['upgrade_link'];
-						$upgrade_target = !strstr( $pro_link, '/wp-admin/' ) ? ' target="_blank"' : '';
 					}
+					if ( isset( $args['upgrade_link'] ) ) {
+						$upgrade_link = $args['upgrade_link'];
+						$upgrade_target = !strstr( $upgrade_link, '/wp-admin/' ) ? ' target="_blank"' : '';
+					}
+					// 1.2.1: fix to check pro_link not upgrade_link
 					if ( isset( $args['pro_link'] ) ) {
 						$pro_link = $args['pro_link'];
 						$pro_target = !strstr( $pro_link, '/wp-admin/' ) ? ' target="_blank"' : '';
@@ -2864,10 +2894,10 @@ if ( !class_exists( 'PLUGIN_PANEL_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'PLUGIN_PANEL_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'radio_station_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
-	function PLUGIN_PANEL_load_prefixed_functions() {
+if ( !function_exists( 'radio_station_load_prefixed_functions' ) ) {
+	function radio_station_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -2876,8 +2906,8 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'PLUGIN_PANEL_get_namespace_from_function' ) ) {
-			function PLUGIN_PANEL_get_namespace_from_function( $f ) {
+		if ( !function_exists( 'radio_station_get_namespace_from_function' ) ) {
+			function radio_station_get_namespace_from_function( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -2886,9 +2916,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'PLUGIN_PANEL_loader_instance' ) ) {
-			function PLUGIN_PANEL_loader_instance() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_loader_instance' ) ) {
+			function radio_station_loader_instance() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
@@ -2898,9 +2928,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Freemius Instance
 		// ---------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'PLUGIN_PANEL_freemius_instance' ) ) {
-			function PLUGIN_PANEL_freemius_instance() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_freemius_instance' ) ) {
+			function radio_station_freemius_instance() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -2910,9 +2940,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Plugin Data
 		// ---------------
 		// 1.1.1: added function for getting plugin data
-		if ( !function_exists( 'PLUGIN_PANEL_plugin_data' ) ) {
-			function PLUGIN_PANEL_plugin_data() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_plugin_data' ) ) {
+			function radio_station_plugin_data() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
@@ -2923,9 +2953,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get Plugin Version
 		// ------------------
 		// 1.1.2: added function for getting plugin version
-		if ( !function_exists( 'PLUGIN_PANEL_plugin_version' ) ) {
-			function PLUGIN_PANEL_plugin_version() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_plugin_version' ) ) {
+			function radio_station_plugin_version() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_version();
@@ -2935,9 +2965,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------------
 		// Set Pro Namespace
 		// -----------------
-		if ( !function_exists( 'PLUGIN_PANEL_pro_namespace' ) ) {
-			function PLUGIN_PANEL_pro_namespace( $pronamespace ) {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_pro_namespace' ) ) {
+			function radio_station_pro_namespace( $pronamespace ) {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->pro_namespace( $pronamespace );
 			}
@@ -2950,9 +2980,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'PLUGIN_PANEL_add_settings' ) ) {
-			function PLUGIN_PANEL_add_settings() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_add_settings' ) ) {
+			function radio_station_add_settings() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -2961,9 +2991,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'PLUGIN_PANEL_default_settings' ) ) {
-			function PLUGIN_PANEL_default_settings( $key = false ) {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_default_settings' ) ) {
+			function radio_station_default_settings( $key = false ) {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -2973,9 +3003,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'PLUGIN_PANEL_get_options' ) ) {
-			function PLUGIN_PANEL_get_options() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_options' ) ) {
+			function radio_station_get_options() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -2985,9 +3015,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'PLUGIN_PANEL_get_setting' ) ) {
-			function PLUGIN_PANEL_get_setting( $key, $filter = true ) {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_setting' ) ) {
+			function radio_station_get_setting( $key, $filter = true ) {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -2998,9 +3028,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'PLUGIN_PANEL_get_settings' ) ) {
-			function PLUGIN_PANEL_get_settings( $filter = true ) {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_get_settings' ) ) {
+			function radio_station_get_settings( $filter = true ) {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -3010,9 +3040,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'PLUGIN_PANEL_reset_settings' ) ) {
-			function PLUGIN_PANEL_reset_settings() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_reset_settings' ) ) {
+			function radio_station_reset_settings() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -3021,9 +3051,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'PLUGIN_PANEL_update_settings' ) ) {
-			function PLUGIN_PANEL_update_settings() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_update_settings' ) ) {
+			function radio_station_update_settings() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -3032,9 +3062,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'PLUGIN_PANEL_delete_settings' ) ) {
-			function PLUGIN_PANEL_delete_settings() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_delete_settings' ) ) {
+			function radio_station_delete_settings() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
@@ -3045,9 +3075,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'PLUGIN_PANEL_message_box' ) ) {
-			function PLUGIN_PANEL_message_box( $message, $echo = false ) {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_message_box' ) ) {
+			function radio_station_message_box( $message, $echo = false ) {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -3057,9 +3087,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'PLUGIN_PANEL_settings_header' ) ) {
-			function PLUGIN_PANEL_settings_header() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_header' ) ) {
+			function radio_station_settings_header() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -3068,9 +3098,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'PLUGIN_PANEL_settings_page' ) ) {
-			function PLUGIN_PANEL_settings_page() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_page' ) ) {
+			function radio_station_settings_page() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -3080,9 +3110,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'PLUGIN_PANEL_settings_table' ) ) {
-			function PLUGIN_PANEL_settings_table() {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_table' ) ) {
+			function radio_station_settings_table() {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -3092,9 +3122,9 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'PLUGIN_PANEL_settings_row' ) ) {
-			function PLUGIN_PANEL_settings_row( $option, $setting ) {
-				$namespace = PLUGIN_PANEL_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'radio_station_settings_row' ) ) {
+			function radio_station_settings_row( $option, $setting ) {
+				$namespace = radio_station_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -3154,6 +3184,12 @@ if ( !function_exists( 'PLUGIN_PANEL_load_prefixed_functions' ) ) {
 // =========
 // CHANGELOG
 // =========
+
+// == 1.2.1 ==
+// - added filters for premium and addons init
+// - fix overriding of plan arg to free
+// - add check if premium already installed
+// - fix namespace typo in add settings action
 
 // == 1.2.0 ==
 // - fix missing CSV field type row output condition
