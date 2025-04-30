@@ -3,16 +3,59 @@
 // =================================
 // === Plugin Panel Loader Class ===
 // =================================
-//
-// --------------
-// Version: 1.2.9
-// --------------
-// Note: Changelog and structure at end of file.
-//
+
+// -------------
+// Loader v1.3.1
+// -------------
+// Note: Changelog at end of file.
+
+if ( !defined( 'ABSPATH' ) ) exit;
+
+// === Loader Class ===
+// - Initialize Loader
+// - Setup Plugin
+// - Get Plugin Data
+// - Get Plugin Version
+// - Set Pro Namespace
+// === Plugin Settings ===
+// - Get Default Settings
+// - Add Settings
+// - Maybe Transfer Settings
+// - Get All Plugin Settings
+// - Get Plugin Setting
+// - Reset Plugin Settings
+// - Update Plugin Settings
+// - Validate Plugin Setting
+// === Plugin Loading ===
+// - Load Plugin Settings
+// - Add Actions
+// - Load Helper Libraries
+// - Maybe Load Thickbox
+// - Readme Viewer AJAX
+// === Freemius Loading ===
+// - Load Freemius
+// - Filter Freemius Connect
+// - Freemius Connect Message
+// - Connect Update Message
+// === Plugin Admin ===
+// - Add Settings Menu
+// - Plugin Page Links
+// - Message Box
+// - Notice Boxer
+// - Plugin Page Header
+// - Settings Page
+// - Settings Table
+// - Setting Row
+// - Settings Scripts
+// - Settings Styles
+// === Namespaced Functions ===
+
+
 // ============
 // Loader Usage
 // ============
-// 1. replace all occurrences of PREFIX_ in this file with the plugin namespace prefix eg. my_plugin_
+// 1. replace all occurrences of loader_prefix_ in this file with the plugin namespace prefix eg. my_plugin_
+// 2. replace all occurrences of 'text-domain' in this file with the plugin's translation text domain
 // 2. define plugin options, default settings, and setup arguments your main plugin file
 // 3. require this file in the main plugin file and instantiate the loader class (see example below)
 //
@@ -56,11 +99,11 @@
 //	'parentmenu'	=> 'wordquest',		// parent menu slug
 //	'home'			=> 'http://mysite.com/plugins/plugin/',
 //	'support'		=> 'http://mysite.com/plugins/plugin/support/',
-//	'ratetext'		=> __('Rate on WordPress.org'),		// (overrides default rate text)
+//	'ratetext'		=> __( 'Rate on WordPress.org', 'text-domain' ),		// (overrides default rate text)
 //	'share'			=> 'http://mysites.com/plugins/plugin/#share', // (set sharing URL)
-//	'sharetext'		=> __('Share the Plugin Love'),		// (overrides default sharing text)
+//	'sharetext'		=> __( 'Share the Plugin Love', 'text-domain' ),		// (overrides default sharing text)
 //	'donate'		=> 'https://patreon.com/pagename',	// (overrides plugin Donate URI)
-//	'donatetext'	=> __('Support this Plugin'),		// (overrides default donate text)
+//	'donatetext'	=> __( 'Support this Plugin', 'text-domain' ),		// (overrides default donate text)
 //	'readme'		=> false,			// to not link to popup readme in settings page header
 //	'settingsmenu'	=> false,			// to not automatically add a settings menu [non-WQ]
 //
@@ -88,17 +131,17 @@
 // ------------------------------------
 // (add this to your main plugin file to run this loader)
 // require(dirname(__FILE__).'/loader.php');				// requires this file!
-// $instance = new PREFIX_loader($args);				// instantiates loader class
-// (ie. search and replace 'PREFIX_' with 'my_plugin_' function namespace)
+// $instance = new loader_prefix_loader($args);				// instantiates loader class
+// (ie. search and replace 'loader_prefix_' with 'my_plugin_' function namespace)
 
 
 // ===========================
 // --- Plugin Loader Class ---
 // ===========================
 // usage: change class prefix to the plugin function prefix
-if ( !class_exists( 'PREFIX_loader' ) ) {
+if ( !class_exists( 'loader_prefix_loader' ) ) {
 	// phpcs:ignore PEAR.NamingConventions.ValidClassName.Invalid,PEAR.NamingConventions.ValidClassName.StartWithCapital
-	class PREFIX_loader {
+	class loader_prefix_loader {
 
 		public $args = null;
 		public $namespace = null;
@@ -227,16 +270,19 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			// --- Pro Functions ---
 			if ( !isset( $args['proslug'] ) ) {
 				$proslug = $this->plugin_data( '@fs_premium_only' );
-				// 1.0.1: if more than one file, extract pro slug based on the first filename
-				if ( !strstr( $proslug, ',' ) ) {
-					$profiles = array( $proslug );
-					$proslug = trim( $proslug );
-				} else {
-					$profiles = explode( ',', $proslug );
-					$proslug = trim( $profiles[0] );
+				// 1.3.0: check for pro slug string
+				if ( is_string( $proslug ) ) {
+					// 1.0.1: if more than one file, extract pro slug based on the first filename
+					if ( !strstr( $proslug, ',' ) ) {
+						$profiles = array( $proslug );
+						$proslug = trim( $proslug );
+					} else {
+						$profiles = explode( ',', $proslug );
+						$proslug = trim( $profiles[0] );
+					}
+					$args['proslug'] = substr( $proslug, 0, - 4 ); // strips .php extension
+					$args['profiles'] = $profiles;
 				}
-				$args['proslug'] = substr( $proslug, 0, - 4 ); // strips .php extension
-				$args['profiles'] = $profiles;
 			}
 
 			// --- Update Loader Args ---
@@ -433,14 +479,14 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			}
 			// 1.0.5: use sanitize_title on request variables
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			if ( sanitize_title( $_REQUEST['page'] ) != $args['slug'] ) {
+			if ( sanitize_text_field( $_REQUEST['page'] ) != $args['slug'] ) {
 				return;
 			}
 			if ( !isset( $_POST[$args['namespace'] . '_update_settings'] ) ) {
 				return;
 			}
 			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			if ( 'reset' != sanitize_title( $_POST[$args['namespace'] . '_update_settings'] ) ) {
+			if ( 'reset' != sanitize_text_field( $_POST[$args['namespace'] . '_update_settings'] ) ) {
 				return;
 			}
 
@@ -451,7 +497,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			}
 
 			// --- verify nonce ---
-			// $noncecheck = wp_verify_nonce( $_POST['_wpnonce', $args['slug'].'_update_settings' );
+			// $noncecheck = wp_verify_nonce( sanitize_text_field( $_POST['_wpnonce'] ), $args['slug'] . '_update_settings' );
 			check_admin_referer( $args['slug'] . '_update_settings' );
 
 			// --- reset plugin settings ---
@@ -481,11 +527,12 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			// 1.0.2: fix to namespace key typo in isset check
 			// 1.0.3: only use namespace not settings key
 			// 1.0.9: check page is set and matches slug
-			if ( !isset( $_REQUEST['page'] ) || ( $_REQUEST['page'] != $args['slug'] ) ) {
+			if ( !isset( $_REQUEST['page'] ) || ( sanitize_text_field( $_REQUEST['page'] != $args['slug'] ) ) ) {
 				return;
 			}
 			$updatekey = $args['namespace'] . '_update_settings';
-			if ( !isset( $_POST[$updatekey] ) || ( 'yes' != $_POST[$args['namespace'] . '_update_settings'] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing
+			if ( !isset( $_POST[$updatekey] ) || ( 'yes' != sanitize_text_field( $_POST[$args['namespace'] . '_update_settings'] ) ) ) {
 				return;
 			}
 
@@ -496,7 +543,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			}
 
 			// --- verify nonce ---
-			// $noncecheck = wp_verify_nonce( $_POST['_wpnonce', $args['slug'].'_update_settings' );
+			// $noncecheck = wp_verify_nonce( sanitize_text_field( $_POST['_wpnonce'] ), $args['slug'] . '_update_settings' );
 			check_admin_referer( $args['slug'] . '_update_settings' );
 
 			// --- get plugin options and default settings ---
@@ -618,7 +665,11 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 						// --- text area ---
 						// 1.2.5: use sanitize_textarea_field with stripslashes
-						$posted = isset( $_POST[$postkey] ) ? sanitize_textarea_field( stripslashes( $_POST[$postkey] ) ) : null;
+						$posted = isset( $_POST[$postkey] ) ? sanitize_textarea_field( $_POST[$postkey] ) : null;
+						// 1.3.0: move use of stripslashes to separate line
+						if ( !is_null( $posted ) ) {
+							$posted = stripslashes( $posted );
+						}
 						$settings[$key] = $posted;
 
 					} elseif ( 'text' == $type ) {
@@ -628,6 +679,16 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						$posted = isset( $_POST[$postkey] ) ? sanitize_text_field( $_POST[$postkey] ) : null;
 						if ( !is_string( $valid ) ) {
 							$valid = 'TEXT';
+						}
+						$newsettings = $posted;
+
+					} elseif ( 'email' == $type ) {
+
+						// --- email field ---
+						// 1.3.0: added explicitly for email field type
+						$posted = isset( $_POST[$postkey] ) ? sanitize_text_field( $_POST[$postkey] ) : null;
+						if ( !is_string( $valid ) ) {
+							$valid = 'EMAIL';
 						}
 						$newsettings = $posted;
 
@@ -782,6 +843,16 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						}
 						$settings[$key] = $posted;
 
+					} else {
+						
+						// --- fallback to text type ---
+						// 1.3.0: added for unspecified option field type
+						$posted = isset( $_POST[$postkey] ) ? sanitize_text_field( $_POST[$postkey] ) : null;
+						if ( !is_string( $valid ) ) {
+							$valid = 'TEXT';
+						}
+						$newsettings = $posted;						
+						
 					}
 
 					if ( $this->debug ) {
@@ -794,7 +865,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							// 1.1.7 handle if (new) key not set yet
 							if ( isset( $settings[$key] ) ) {
 								// phpcs:ignore WordPress.PHP.DevelopmentFunctions
-								echo '(Validated) ' . esc_html( print_r( $settings[$key], true ) ) . '<br>' . PHP_EOL;
+								echo '(Validated) ' . esc_html( print_r( $settings[$key], true ) ) . '<br>' . "\n";
 							} else {
 								echo 'No setting yet for key ' . esc_html( $key ) . '<br>' . "\n";
 							}
@@ -912,7 +983,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					}
 					if ( count( $tabs ) > 0 ) {
 						// 1.2.5: sanitize current tab value before validating
-						$currenttab = sanitize_title( $_POST['settingstab'] );
+						$currenttab = sanitize_text_field( $_POST['settingstab'] );
 						if ( in_array( $currenttab, $tabs ) ) {
 							$settings['settingstab'] = $currenttab;
 						} elseif ( in_array( 'general', $tabs ) ) {
@@ -1342,27 +1413,43 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				// --- include Markdown Readme Parser ---
 				include $parser;
 
-				// --- remove license info as causes breakage! ---
-				// TODO: find line start and end to handle other possible licenses
-				$contents = str_replace( 'License: GPLv2 or later', '', $contents );
-				$contents = str_replace( 'License URI: http://www.gnu.org/licenses/gpl-2.0.html', '', $contents );
+				// --- remove license lines as causing breakage! ---
+				// 1.3.1: find license lines to handle other possible licenses
+				// $contents = str_replace( 'License: GPLv2 or later', '', $contents );
+				// $contents = str_replace( 'License URI: http://www.gnu.org/licenses/gpl-2.0.html', '', $contents );
+				$strip_lines = array( 'License', 'License URI' );
+				foreach( $strip_lines as $strip_line ) {
+					if ( strstr( $contents, $strip_line ) ) {
+						$pos = strpos( $contents, $strip_line . ':' );
+						$chunks = str_split( $contents, $pos );
+						$before = $chunks[0];
+						unset( $chunks[0] );
+						$remainder = implode( '', $chunks );
+						$posb = strpos( $remainder, "\n" );
+						$chunks = str_split( $remainder, $posb );
+						unset( $chunks[0] );
+						$remainder = implode( '', $chunks );
+						$contents = $before . $remainder;
+					}
+				}
 
 				// --- instantiate Parser class ---
-				$readme = new WordPress_Readme_Parser();
+				// 1.3.1: prefix readme parser
+				$readme = new loader_prefix_readme_parser();
 				$parsed = $readme->parse_readme_contents( $contents );
 
 				// --- output plugin info ---
-				echo '<b>' . esc_html( __( 'Plugin Name' ) ) . '</b>: ' . esc_html( $parsed['name'] ) . '<br>' . PHP_EOL;
-				// echo '<b>' . esc_html( __( 'Tags' ) ) . '</b>: ' . esc_html( implode( ', ', $parsed['tags'] ) ) . '<br>' . PHP_EOL;
-				echo '<b>' . esc_html( __( 'Requires at least' ) ) . '</b>: ' . esc_html( __( 'WordPress' ) ) . ' v' . esc_html( $parsed['requires_at_least'] ) . '<br>' . PHP_EOL;
-				echo '<b>' . esc_html( __( 'Tested up to' ) ) . '</b>: ' . esc_html( __( 'WordPress' ) ) . ' v' . esc_html( $parsed['tested_up_to'] ) . '<br>' . PHP_EOL;
+				echo '<b>' . esc_html( __( 'Plugin Name', 'text-domain' ) ) . '</b>: ' . esc_html( $parsed['name'] ) . '<br>' . "\n";
+				// echo '<b>' . esc_html( __( 'Tags', 'text-domain' ) ) . '</b>: ' . esc_html( implode( ', ', $parsed['tags'] ) ) . '<br>' . "\n";
+				echo '<b>' . esc_html( __( 'Requires at least', 'text-domain' ) ) . '</b>: ' . esc_html( __( 'WordPress', 'text-domain' ) ) . ' v' . esc_html( $parsed['requires_at_least'] ) . '<br>' . "\n";
+				echo '<b>' . esc_html( __( 'Tested up to', 'text-domain' ) ) . '</b>: ' . esc_html( __( 'WordPress', 'text-domain' ) ) . ' v' . esc_html( $parsed['tested_up_to'] ) . '<br>' . "\n";
 				if ( isset( $parsed['stable_tag'] ) ) {
-					echo '<b>' . esc_html( __( 'Stable Tag' ) ) . '</b>: ' . esc_html( $parsed['stable_tag'] ) . '<br>' . PHP_EOL;
+					echo '<b>' . esc_html( __( 'Stable Tag', 'text-domain' ) ) . '</b>: ' . esc_html( $parsed['stable_tag'] ) . '<br>' . "\n";
 				}
-				echo '<b>' . esc_html( __( 'Contributors' ) ) . '</b>: ' . esc_html( implode( ', ', $parsed['contributors'] ) ) . '<br>' . PHP_EOL;
+				echo '<b>' . esc_html( __( 'Contributors', 'text-domain' ) ) . '</b>: ' . esc_html( implode( ', ', $parsed['contributors'] ) ) . '<br>' . "\n";
 				// echo '<b>Donate Link</b>: <a href="' . esc_url( $parsed['donate_link'] ) . '" target="_blank">' . esc_html( $parsed['donate_link'] ) . '</a><br>';
 				// 1.2.5: use wp_kses_post on plugin short description markup
-				echo '<br>' . wp_kses_post( $parsed['short_description'] ) . '<br><br>' . PHP_EOL;
+				echo '<br>' . wp_kses_post( $parsed['short_description'] ) . '<br><br>' . "\n";
 
 				// --- output sections ---
 				// possible sections: 'description', 'installation', 'frequently_asked_questions',
@@ -1379,13 +1466,13 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							$parts[$i] = strtoupper( substr( $part, 0, 1 ) ) . substr( $part, 1 );
 						}
 						$title = implode( ' ', $parts );
-						echo '<h3>' . esc_html( $title ) . '</h3>' . PHP_EOL;
+						echo '<h3>' . esc_html( $title ) . '</h3>' . "\n";
 						// 1.2.5: use wp_kses_post on readme section output
 						echo wp_kses_post( $section );
 					}
 				}
 				if ( isset( $parsed['remaining_content'] ) && !empty( $remaining_content ) ) {
-					echo '<h3>' . esc_html( __( 'Extra Notes' ) ) . '</h3>' . PHP_EOL;
+					echo '<h3>' . esc_html( __( 'Extra Notes', 'text-domain' ) ) . '</h3>' . "\n";
 					// 1.2.5: use wp_kses_post on readme extra notes output
 					echo wp_kses_post( $parsed['remaining_content'] );
 				}
@@ -1514,11 +1601,16 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				if ( !isset( $args['contact'] ) ) {
 					$args['contact'] = $premium;
 				}
+				if ( !isset( $args['affiliation'] ) ) {
+					// 1.3.1: fix to key typo (affiliaation)
+					$args['affiliation'] = false;
+				}
 
 				// --- set Freemius settings from plugin settings ---
-				// 1.1.1: remove admin_url wrapper on Freemius first-path value
-				// TODO: further possible args for Freemius init (eg. bundle_id)
 				// ref: https://freemius.com/help/documentation/wordpress-sdk/integrating-freemius-sdk/
+				// 1.1.1: remove admin_url wrapper on Freemius first-path value
+				// 1.3.0: added has_affiliation argument key
+				// TODO: further possible args for Freemius init (eg. bundle_id)
 				$first_path = add_query_arg( 'page', $args['slug'], 'admin.php' );
 				$first_path = add_query_arg( 'welcome', 'true', $first_path );
 				$settings = array(
@@ -1530,6 +1622,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					'has_paid_plans'   => $args['hasplans'],
 					'is_org_compliant' => $args['wporg'],
 					'is_premium'       => $premium,
+					'has_affiliation'  => $args['affiliation'],
 					'menu'             => array(
 						'slug'       => $args['slug'],
 						'first-path' => $first_path,
@@ -1548,7 +1641,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				$settings = apply_filters( 'freemius_init_settings_' . $args['namespace'], $settings );
 				if ( $this->debug ) {
 					// phpcs:ignore WordPress.PHP.DevelopmentFunctions
-					echo '<span style="display:none;">Freemius Settings: ' . esc_html( print_r( $settings, true ) ) . '</span>' . PHP_EOL;
+					echo '<span style="display:none;">Freemius Settings: ' . esc_html( print_r( $settings, true ) ) . '</span>' . "\n";
 				}
 				if ( !$settings || !is_array( $settings ) ) {
 					return;
@@ -1556,10 +1649,6 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 				// --- initialize Freemius now ---
 				$freemius = $GLOBALS[$namespace . '_freemius'] = fs_dynamic_init( $settings );
-				if ( $this->debug ) {
-					// phpcs:ignore WordPress.PHP.DevelopmentFunctions
-					echo '<span style="display:none;">Freemius Object: ' . esc_html( print_r( $freemius, true ) ) . '</span>' . PHP_EOL;
-				}
 
 				// --- set plugin basename ---
 				// 1.0.1: set free / premium plugin basename
@@ -1570,6 +1659,12 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				// --- add Freemius connect message filter ---
 				$this->freemius_connect();
 
+				// --- Freemius Object Debug ---
+				if ( $this->debug && current_user_can( 'manage_options' ) ) {
+					// phpcs:ignore WordPress.PHP.DevelopmentFunctions
+					echo '<span style="display:none;">Freemius Object: ' . esc_html( print_r( $freemius, true ) ) . '</span>' . "\n";
+				}
+				
 				// --- fire Freemius loaded action ---
 				do_action( $args['namespace'] . '_loaded' );
 			}
@@ -1596,7 +1691,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			// 1.2.4: added ordering to replacement arguments
 			$message .= sprintf(
 				// Translators: plugin title, user name, site link, freemius link
-				__( 'If you want to more easily access support and feedback for this plugins features and functionality, %1$s can connect your user, %2$s at %3$s, to %4$s' ),
+				__( 'If you want to more easily access support and feedback for this plugins features and functionality, %1$s can connect your user, %2$s at %3$s, to %4$s', 'text-domain' ),
 				'<b>' . $plugin_title . '</b>',
 				'<b>' . $user_login . '</b>',
 				$site_link,
@@ -1657,7 +1752,8 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			if ( !$menu_added ) {
 				// 1.0.8: check settingsmenu switch that disables automatic settings menu adding
 				if ( !isset( $args['settingsmenu'] ) || ( false !== $args['settingsmenu'] ) ) {
-					add_options_page( $args['pagetitle'], $args['menutitle'], $args['capability'], $args['slug'], $args['namespace'] . '_settings_page' );
+					// 1.3.0: use filtered pagetitle and menutitle
+					add_options_page( $pagetitle, $menutitle, $args['capability'], $args['slug'], $args['namespace'] . '_settings_page' );
 				}
 			}
 
@@ -1679,7 +1775,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				// (depending on whether top level menu or Settings submenu item)
 				$page = $this->menu_added ? 'admin.php' : 'options-general.php';
 				$settings_url = add_query_arg( 'page', $args['slug'], admin_url( $page ) );
-				$settings_link = '<a href="' . esc_url( $settings_url ) . '">' . esc_html( __( 'Settings' ) ) . '</a>';
+				$settings_link = '<a href="' . esc_url( $settings_url ) . '">' . esc_html( __( 'Settings', 'text-domain' ) ) . '</a>';
 				$link = array( 'settings' => $settings_link );
 				$links = array_merge( $link, $links );
 
@@ -1697,7 +1793,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							$upgrade_url = add_query_arg( 'page', $args['slug'] . '-pricing', admin_url( 'admin.php' ) );
 							$upgrade_target = !strstr( $upgrade_url, '/wp-admin/' ) ? ' target="_blank"' : '';
 						}
-						$upgrade_link = '<b><a href="' . esc_url( $upgrade_url ) . '"' . $upgrade_target . ">" . esc_html( __( 'Upgrade' ) ) . '</a></b>';
+						$upgrade_link = '<b><a href="' . esc_url( $upgrade_url ) . '"' . $upgrade_target . ">" . esc_html( __( 'Upgrade', 'text-domain' ) ) . '</a></b>';
 						$link = array( 'upgrade' => $upgrade_link );
 						$links = array_merge( $link, $links );
 
@@ -1705,7 +1801,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						// 1.2.0: added separate pro details link
 						if ( isset( $args['pro_link'] ) ) {
 							$pro_target = !strstr( $args['pro_link'], '/wp-admin/' ) ? ' target="_blank"' : '';
-							$pro_link = '<b><a href="' . esc_url( $args['pro_link'] ) . '"' . $pro_target . '>' . esc_html( __( 'Pro Details' ) ) . '</a></b>';
+							$pro_link = '<b><a href="' . esc_url( $args['pro_link'] ) . '"' . $pro_target . '>' . esc_html( __( 'Pro Details', 'text-domain' ) ) . '</a></b>';
 							$link = array( 'pro-details' => $pro_link );
 							$links = array_merge( $link, $links );
 						}
@@ -1719,7 +1815,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					if ( isset( $args['addons_link'] ) ) {
 						$addons_url = $args['addons_link'];
 						$addons_target = !strstr( $addons_url, '/wp-admin/' ) ? ' target="_blank"' : '';
-						$addons_link = '<a href="' . esc_url( $addons_url ) . '"' . $addons_target . '>' . esc_html( __( 'Add Ons' ) ) . '</a>';
+						$addons_link = '<a href="' . esc_url( $addons_url ) . '"' . $addons_target . '>' . esc_html( __( 'Add Ons', 'text-domain' ) ) . '</a>';
 						$link = array( 'addons' => $addons_link );
 						$links = array_merge( $link, $links );
 					}
@@ -1727,7 +1823,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 				if ( $this->debug ) {
 					// phpcs:ignore WordPress.PHP.DevelopmentFunctions
-					echo '<span style="display:none;">Plugin Links for ' . esc_html( $file ) . ': ' . esc_html( print_r( $links, true ) ) . '</span>' . PHP_EOL;
+					echo '<span style="display:none;">Plugin Links for ' . esc_html( $file ) . ': ' . esc_html( print_r( $links, true ) ) . '</span>' . "\n";
 				}
 			}
 
@@ -1744,14 +1840,14 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				ob_start();
 			}
 
-			echo '<table style="background-color: lightYellow; border-style:solid; border-width:1px; border-color: #E6DB55; text-align:center;">' . PHP_EOL;
-				echo '<tr><td>' . PHP_EOL;
-					echo '<div class="message" style="margin:0.25em; font-weight:bold;">' . PHP_EOL;
+			echo '<table style="background-color: lightYellow; border-style:solid; border-width:1px; border-color: #E6DB55; text-align:center;">' . "\n";
+				echo '<tr><td>' . "\n";
+					echo '<div class="message" style="margin:0.25em; font-weight:bold;">' . "\n";
 						// 1.2.5: added wp_kses_post to message output
-						echo wp_kses_post( $message ) . PHP_EOL;
-					echo '</div>' . PHP_EOL;
-				echo '</td></tr>' . PHP_EOL;
-			echo '</table>' . PHP_EOL;
+						echo wp_kses_post( $message ) . "\n";
+					echo '</div>' . "\n";
+				echo '</td></tr>' . "\n";
+			echo '</table>' . "\n";
 			if ( !$echo ) {
 				$box = ob_get_contents();
 				ob_end_clean();
@@ -1774,24 +1870,24 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			}
 			// 1.0.5: use sanitize_title on request variable
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			if ( substr( sanitize_title( $_REQUEST['page'] ), 0, strlen( $args['slug'] ) ) != $args['slug'] ) {
+			if ( substr( sanitize_text_field( $_REQUEST['page'] ), 0, strlen( $args['slug'] ) ) != $args['slug'] ) {
 				return;
 			}
 
 			// 1.2.2: bug out if adminsanity notices are loaded
-			if ( isset( $GLOBALS['PREFIX_data']['load']['notices'] ) && $GLOBALS['PREFIX_data']['load']['notices'] ) {
+			if ( isset( $GLOBALS['loader_prefix_data']['load']['notices'] ) && $GLOBALS['loader_prefix_data']['load']['notices'] ) {
 				return;
 			}
 
 			// --- output notice box ---
-			echo '<div style="width: 98%;" id="admin-notices-box" class="postbox">' . PHP_EOL;
-			echo '<h3 class="admin-notices-title" style="cursor:pointer; margin:7px 14px; font-size:16px;" onclick="settings_toggle_notices();">' . PHP_EOL;
-			echo '<span id="admin-notices-arrow" style="font-size:24px;">&#9656;</span> &nbsp; ' . PHP_EOL;
-			echo '<span id="admin-notices-title" style="vertical-align:top;">' . esc_html( __( 'Notices' ) ) . '</span>  &nbsp; ' . PHP_EOL;
-			echo '<span id="admin-notices-count" style="vertical-align:top;"></span></h3>' . PHP_EOL;
+			echo '<div style="width: 98%;" id="admin-notices-box" class="postbox">' . "\n";
+			echo '<h3 class="admin-notices-title" style="cursor:pointer; margin:7px 14px; font-size:16px;" onclick="settings_toggle_notices();">' . "\n";
+			echo '<span id="admin-notices-arrow" style="font-size:24px;">&#9656;</span> &nbsp; ' . "\n";
+			echo '<span id="admin-notices-title" style="vertical-align:top;">' . esc_html( __( 'Notices', 'text-domain' ) ) . '</span>  &nbsp; ' . "\n";
+			echo '<span id="admin-notices-count" style="vertical-align:top;"></span></h3>' . "\n";
 
-			echo '<div id="admin-notices-wrap" style="display:none";><h2 style="display:none;"></h2></div>' . PHP_EOL;
-			echo '</div>' . PHP_EOL;
+			echo '<div id="admin-notices-wrap" style="display:none";><h2 style="display:none;"></h2></div>' . "\n";
+			echo '</div>' . "\n";
 
 			// --- toggle notice box script ---
 			echo "<script>function settings_toggle_notices() {
@@ -1830,20 +1926,21 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				echo '<br><b>Current Settings:</b><br>';
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions
 				echo esc_html( print_r( $settings, true ) );
-				echo '<br><br>' . PHP_EOL;
+				echo '<br><br>' . "\n";
 
 				echo '<br><b>Plugin Options:</b><br>';
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions
 				echo esc_html( print_r( $this->options, true ) );
-				echo '<br><br>' . PHP_EOL;
+				echo '<br><br>' . "\n";
 
 				// phpcs:ignore WordPress.Security.NonceVerification.Missing
 				if ( isset( $_POST ) ) {
 					echo '<br><b>Posted Values:</b><br>';
 					// phpcs:ignore WordPress.Security.NonceVerification.Missing
-					foreach ( $_POST as $key => $value ) {
+					$posted = array_map( 'sanitize_text_field', $_POST );
+					foreach ( $posted as $key => $value ) {
 						// phpcs:ignore WordPress.PHP.DevelopmentFunctions
-						echo esc_attr( $key ) . ': ' . esc_html( print_r( $value, true ) ) . '<br>' . PHP_EOL;
+						echo esc_html( $key ) . ': ' . esc_html( print_r( $value, true ) ) . '<br>' . "\n";
 					}
 				}
 			}
@@ -1870,53 +1967,53 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			$author_icon_url = apply_filters( $namespace . '_author_icon_url', $author_icon_url );
 
 			// --- open header table ---
-			echo '<table class="plugin-settings-page-header"><tr>' . PHP_EOL;
+			echo '<table class="plugin-settings-page-header"><tr>' . "\n";
 
 			// --- plugin icon ---
 			// 1.1.9: add filter for plugin icon url
 			$icon_url = apply_filters( $namespace . '_settings_page_icon_url', $icon_url );
-			echo '<td>' . PHP_EOL;
+			echo '<td>' . "\n";
 			if ( $icon_url ) {
-				echo '<img class="plugin-settings-page-icon" src="' . esc_url( $icon_url ) . '" width="128" height="128">' . PHP_EOL;
+				echo '<img class="plugin-settings-page-icon" src="' . esc_url( $icon_url ) . '" width="128" height="128">' . "\n";
 			}
-			echo '</td>' . PHP_EOL;
+			echo '</td>' . "\n";
 
-			echo '<td width="20"></td><td>' . PHP_EOL;
+			echo '<td width="20"></td><td>' . "\n";
 
-			echo '<table><tr>' . PHP_EOL;
+			echo '<table><tr>' . "\n";
 
 			// --- plugin title ---
 			// 1.1.9: add filter for plugin pagetitle
-			$title = apply_filters( $namespace . '_settings_page_title', $args['title'] ) . PHP_EOL;
-			echo '<td><h3 style="font-size:20px;">' . PHP_EOL;
-			echo '<a href="' . esc_url( $args['home'] ) . '" target="_blank" style="text-decoration:none;">' . esc_html( $title ) . '</a>' . PHP_EOL;
-			echo '</h3></td>' . PHP_EOL;
+			$title = apply_filters( $namespace . '_settings_page_title', $args['title'] );
+			echo '<td><h3 style="font-size:20px;">' . "\n";
+			echo '<a href="' . esc_url( $args['home'] ) . '" target="_blank" style="text-decoration:none;">' . esc_html( $title ) . '</a>' . "\n";
+			echo '</h3></td>' . "\n";
 
-			echo '<td width="20"></td>' . PHP_EOL;
+			echo '<td width="20"></td>' . "\n";
 
 			// --- plugin version ---
 			// 1.1.9: add filter for plugin version
 			$version = apply_filters( $namespace . '_settings_page_version', 'v' . $args['version'] );
-			echo '<td><h3 class="plugin-setttings-page-version">' . esc_html( $version ) . '</h3></td></tr>' . PHP_EOL;
+			echo '<td><h3 class="plugin-setttings-page-version">' . esc_html( $version ) . '</h3></td></tr>' . "\n";
 
 			// --- subtitle ---
 			// 1.1.9: added optional subtitle filter display
 			$subtitle = apply_filters( $namespace . '_settings_page_subtitle', '' );
 			if ( '' != $subtitle ) {
-				echo '<tr><td colspan="3" align="center">' . PHP_EOL;
-				echo '<h4 class="plugins-settings-page-subtitle" style="font-size:14px; margin-top:0;">' . esc_html( $subtitle ) . '</h4>' . PHP_EOL;
-				echo '</td></tr>' . PHP_EOL;
+				echo '<tr><td colspan="3" align="center">' . "\n";
+				echo '<h4 class="plugins-settings-page-subtitle" style="font-size:14px; margin-top:0;">' . esc_html( $subtitle ) . '</h4>' . "\n";
+				echo '</td></tr>' . "\n";
 			}
 
-			echo '<tr><td colspan="3" align="center">' . PHP_EOL;
+			echo '<tr><td colspan="3" align="center">' . "\n";
 
-			echo '<table><tr><td align="center">' . PHP_EOL;
+			echo '<table><tr><td align="center">' . "\n";
 
 			// ---- plugin author ---
 			// 1.0.8: check if author URL is set
 			if ( isset( $args['author_url'] ) ) {
-				echo '<font style="font-size:16px;">' . esc_html( __( 'by' ) ) . '</font> ';
-				echo '<a href="' . esc_url( $args['author_url'] ) . '" target="_blank" style="text-decoration:none;font-size:16px;" target="_blank"><b>' . esc_html( $args['author'] ) . '</b></a><br><br>' . PHP_EOL;
+				echo '<font style="font-size:16px;">' . esc_html( __( 'by', 'text-domain' ) ) . '</font> ';
+				echo '<a href="' . esc_url( $args['author_url'] ) . '" target="_blank" style="text-decoration:none;font-size:16px;" target="_blank"><b>' . esc_html( $args['author'] ) . '</b></a><br><br>' . "\n";
 			}
 
 			// --- readme / docs / support links ---
@@ -1925,20 +2022,20 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			// 1.1.0: added title attributes to links
 			$links = array();
 			if ( isset( $args['home'] ) ) {
-				$links[] = '<a href="' . esc_url( $args['home'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Homepage' ) ) . '" target="_blank"><b>' . esc_html( __( 'Home' ) ) . '</b></a>';
+				$links[] = '<a href="' . esc_url( $args['home'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Homepage', 'text-domain' ) ) . '" target="_blank"><b>' . esc_html( __( 'Home', 'text-domain' ) ) . '</b></a>';
 			}
 			if ( !isset( $args['readme'] ) || ( false !== $args['readme'] ) ) {
 				$readme_url = add_query_arg( 'action', $namespace . '_readme_viewer', admin_url( 'admin-ajax.php' ) );
-				$links[] = '<a href="' . esc_url( $readme_url ) . '" class="pluginlink smalllink thickbox" title="' . esc_attr( __( 'View Plugin' ) ) . ' readme.txt"><b>' . esc_html( __( 'Readme' ) ) . '</b></a>';
+				$links[] = '<a href="' . esc_url( $readme_url ) . '" class="pluginlink smalllink thickbox" title="' . esc_attr( __( 'View Plugin', 'text-domain' ) ) . ' readme.txt"><b>' . esc_html( __( 'Readme', 'text-domain' ) ) . '</b></a>';
 			}
 			if ( isset( $args['docs'] ) ) {
-				$links[] = '<a href="' . esc_url( $args['docs'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Documentation' ) ) . '" target="_blank"><b>' . esc_html( __( 'Docs' ) ) . '</b></a>';
+				$links[] = '<a href="' . esc_url( $args['docs'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Documentation', 'text-domain' ) ) . '" target="_blank"><b>' . esc_html( __( 'Docs', 'text-domain' ) ) . '</b></a>';
 			}
 			if ( isset( $args['support'] ) ) {
-				$links[] = '<a href="' . esc_url( $args['support'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Support' ) ) . '" target="_blank"><b>' . esc_html( __( 'Support' ) ) . '</b></a>';
+				$links[] = '<a href="' . esc_url( $args['support'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Support', 'text-domain' ) ) . '" target="_blank"><b>' . esc_html( __( 'Support', 'text-domain' ) ) . '</b></a>';
 			}
 			if ( isset( $args['development'] ) ) {
-				$links[] = '<a href="' . esc_url( $args['development'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Development' ) ) . '" target="_blank"><b>' . esc_html( __( 'Dev' ) ) . '</b></a>';
+				$links[] = '<a href="' . esc_url( $args['development'] ) . '" class="pluginlink smalllink" title="' . esc_attr( __( 'Plugin Development', 'text-domain' ) ) . '" target="_blank"><b>' . esc_html( __( 'Dev', 'text-domain' ) ) . '</b></a>';
 			}
 
 			// 1.0.9: change filter from _plugin_links to disambiguate
@@ -1950,28 +2047,28 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 			// --- author icon ---
 			if ( $author_icon_url ) {
-				echo '</td><td>' . PHP_EOL;
+				echo '</td><td>' . "\n";
 
 				// 1.0.8: check if author URL is set for link
 				if ( isset( $args['author_url'] ) ) {
-					echo '<a href="' . esc_url( $args['author_url'] ) . '" target="_blank">' . PHP_EOL;
+					echo '<a href="' . esc_url( $args['author_url'] ) . '" target="_blank">' . "\n";
 				}
-				echo '<img src="' . esc_url( $author_icon_url ) . '" width="64" height="64" border="0">' . PHP_EOL;
+				echo '<img src="' . esc_url( $author_icon_url ) . '" width="64" height="64" border="0">' . "\n";
 				if ( isset( $args['author_url'] ) ) {
-					echo '</a>' . PHP_EOL;
+					echo '</a>' . "\n";
 				}
 			}
 
-			echo '</td></tr></table>' . PHP_EOL;
+			echo '</td></tr></table>' . "\n";
 
-			echo '</td></tr></table>' . PHP_EOL;
+			echo '</td></tr></table>' . "\n";
 
-			echo '</td><td width="50"></td><td style="vertical-align:top;">' . PHP_EOL;
+			echo '</td><td width="50"></td><td style="vertical-align:top;">' . "\n";
 
 			// --- plugin supporter links ---
 			// 1.0.1: set rate/share/donate links and texts
 			// 1.0.8: added filters for rate/share/donate links
-			echo '<br><div class="plugin-settings-page-links">' . PHP_EOL;
+			echo '<br><div class="plugin-settings-page-links">' . "\n";
 
 			// --- Rate link ---
 			if ( isset( $args['wporgslug'] ) ) {
@@ -1986,11 +2083,11 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				if ( isset( $args['ratetext'] ) ) {
 					$rate_text = $args['ratetext'];
 				} else {
-					$rate_text = __( 'Rate on WordPress.Org' );
+					$rate_text = __( 'Rate on WordPress.Org', 'text-domain' );
 				}
 				$rate_link = '<a href="' . esc_url( $rate_url ) . '" class="pluginlink" target="_blank">';
-				$rate_link .= '<span style="font-size:24px; color:#FC5; margin-right:10px;" class="dashicons dashicons-star-filled"></span>' . PHP_EOL;
-				$rate_link .= ' ' . esc_html( $rate_text ) . '</a><br><br>' . PHP_EOL;
+				$rate_link .= '<span style="font-size:24px; color:#FC5; margin-right:10px;" class="dashicons dashicons-star-filled"></span>' . "\n";
+				$rate_link .= ' ' . esc_html( $rate_text ) . '</a><br><br>' . "\n";
 				$rate_link = apply_filters( $args['namespace'] . '_rate_link', $rate_link, $args );
 				if ( $rate_link ) {
 					// 1.2.5: use wp_kses_post on rate link output
@@ -2003,7 +2100,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				if ( isset( $args['sharetext'] ) ) {
 					$share_text = $args['sharetext'];
 				} else {
-					$share_text = __( 'Share the Plugin Love' );
+					$share_text = __( 'Share the Plugin Love', 'text-domain' );
 				}
 				$share_link = '<a href="' . esc_url( $args['share'] ) . '" class="pluginlink" target="_blank">';
 				$share_link .= '<span style="font-size:24px; color:#E0E; margin-right:10px;" class="dashicons dashicons-share"></span> ';
@@ -2020,7 +2117,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				if ( isset( $args['donatetext'] ) ) {
 					$donate_text = $args['donatetext'];
 				} else {
-					$donate_text = __( 'Support this Plugin' );
+					$donate_text = __( 'Support this Plugin', 'text-domain' );
 				}
 				$donate_link = '<a href="' . esc_url( $args['donate'] ) . '" class="pluginlink" target="_blank">';
 				$donate_link .= '<span style="font-size:24px; color:#E00; margin-right:10px;" class="dashicons dashicons-heart"></span> ';
@@ -2032,42 +2129,42 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				}
 			}
 
-			echo '</div></td></tr>' . PHP_EOL;
+			echo '</div></td></tr>' . "\n";
 
 			// --- output updated and reset messages ---
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			if ( isset( $_GET['updated'] ) ) {
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				$updated = sanitize_title( $_GET['updated'] );
+				$updated = sanitize_text_field( $_GET['updated'] );
 				if ( 'yes' == $updated ) {
-					$message = $settings['title'] . ' ' . __( 'Settings Updated.' );
+					$message = $settings['title'] . ' ' . __( 'Settings Updated.', 'text-domain' );
 				} elseif ( 'no' == $updated ) {
-					$message = __( 'Error! Settings NOT Updated.' );
+					$message = __( 'Error! Settings NOT Updated.', 'text-domain' );
 				} elseif ( 'reset' == $updated ) {
-					$message = $settings['title'] . ' ' . __( 'Settings Reset!' );
+					$message = $settings['title'] . ' ' . __( 'Settings Reset!', 'text-domain' );
 				}
 				if ( isset( $message ) ) {
-					echo '<tr><td></td><td></td><td align="center">' . PHP_EOL;
+					echo '<tr><td></td><td></td><td align="center">' . "\n";
 					// 1.2.5: use direct echo option for message box
 					$this->message_box( $message, true );
-					echo '</td></tr>' . PHP_EOL;
+					echo '</td></tr>' . "\n";
 				}
 			} else {
 				// --- maybe output welcome message ---
 				// 1.0.5: use sanitize_title on request variable
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				if ( isset( $_REQUEST['welcome'] ) && ( 'true' == sanitize_title( $_REQUEST['welcome'] ) ) ) {
+				if ( isset( $_REQUEST['welcome'] ) && ( 'true' == sanitize_text_field( $_REQUEST['welcome'] ) ) ) {
 					// 1.2.3: skip output if welcome message argument is empty
 					if ( isset( $args['welcome'] ) && ( '' != $args['welcome'] ) ) {
 						echo '<tr><td colspan="3" align="center">';
 						// 1.2.5: use direct echo option for message box
 						$this->message_box( $args['welcome'], true );
-						echo '</td></tr>' . PHP_EOL;
+						echo '</td></tr>' . "\n";
 					}
 				}
 			}
 
-			echo '</table><br>' . PHP_EOL;
+			echo '</table><br>' . "\n";
 		}
 
 		// -------------
@@ -2078,7 +2175,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			$namespace = $this->namespace;
 
 			// --- open page wrapper ---
-			echo '<div id="pagewrap" class="wrap" style="width:100%;margin-right:0px !important;">' . PHP_EOL;
+			echo '<div id="pagewrap" class="wrap" style="width:100%;margin-right:0 !important;">' . "\n";
 
 			do_action( $namespace . '_admin_page_top' );
 
@@ -2093,7 +2190,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			do_action( $namespace . '_admin_page_bottom' );
 
 			// --- close page wrapper ---
-			echo '</div>' . PHP_EOL;
+			echo '</div>' . "\n";
 		}
 
 		// --------------
@@ -2149,10 +2246,10 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 			// --- output saved settings ---
 			if ( $this->debug ) {
-				echo '<br><b>Saved Settings:</b><br>';
+				echo '<br><b>Saved Settings:</b><br>' . "\n";
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions
 				echo esc_html( print_r( $settings, true ) );
-				echo '<br><br>';
+				echo '<br><br>' . "\n";
 			}
 
 			// --- get option tabs and sections ---
@@ -2208,7 +2305,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				$this->scripts[] = 'tab_switcher';
 
 				$i = 0;
-				echo '<ul id="settings-tab-buttons">' . PHP_EOL;
+				echo '<ul id="settings-tab-buttons">' . "\n";
 				foreach ( $tabs as $tab => $tablabel ) {
 					$class = 'inactive';
 					if ( ( $tab == $currenttab ) || ( ( '' == $currenttab ) && ( 0 == $i ) ) ) {
@@ -2216,12 +2313,12 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					}
 					// 1.2.5: remove onclick attribute and use jQuery click function
 					// onclick="plugin_panel_display_tab(\'' . esc_attr( $tab ) . '\');"
-					echo '<li id="' . esc_attr( $tab ) . '-tab-button" class="settings-tab-button ' . esc_attr( $class ) . '">' . esc_html( $tablabel ) . '</li>' . PHP_EOL;
-					$i ++;
+					echo '<li id="' . esc_attr( $tab ) . '-tab-button" class="settings-tab-button ' . esc_attr( $class ) . '">' . esc_html( $tablabel ) . '</li>' . "\n";
+					$i++;
 				}
-				echo '</ul>' . PHP_EOL;
+				echo '</ul>' . "\n";
 			} else {
-				$tabs = array( 'general' => __( 'General' ) );
+				$tabs = array( 'general' => __( 'General', 'text-domain' ) );
 			}
 
 			// --- reset to default script ---
@@ -2230,19 +2327,19 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 			// --- start settings form ---
 			// 1.2.0: remove unused prefix on settings tab name attribute
-			echo '<form method="post" id="settings-form">' . PHP_EOL;
-			echo '<input type="hidden" name="' . esc_attr( $namespace ) . '_update_settings" id="settings-action" value="yes">' . PHP_EOL;
-			echo '<input type="hidden" name="settingstab" id="settings-tab" value="' . esc_attr( $currenttab ) . '">' . PHP_EOL;
+			echo '<form method="post" id="settings-form">' . "\n";
+			echo '<input type="hidden" name="' . esc_attr( $namespace ) . '_update_settings" id="settings-action" value="yes">' . "\n";
+			echo '<input type="hidden" name="settingstab" id="settings-tab" value="' . esc_attr( $currenttab ) . '">' . "\n";
 			wp_nonce_field( $args['slug'] . '_update_settings' );
 
 			// --- maybe set hidden debug input ---
 			if ( $this->debug ) {
-				echo '<input type="hidden" name="debug" value="yes">' . PHP_EOL;
+				echo '<input type="hidden" name="debug" value="yes">' . "\n";
 			}
 
 			// ---- open wrapbox ---
-			echo '<div id="wrapbox" class="postbox" style="line-height:2em;">' . PHP_EOL;
-			echo '<div class="inner" style="padding-left:20px;">' . PHP_EOL;
+			echo '<div id="wrapbox" class="postbox" style="line-height:2em;">' . "\n";
+			echo '<div class="inner" style="padding-left:20px;">' . "\n";
 
 			// --- output tabbed sections ---
 			$i = 0;
@@ -2253,11 +2350,11 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				if ( ( $currenttab == $tab ) || ( ( '' == $currenttab ) && ( 0 == $i ) ) ) {
 					$class = 'active';
 				}
-				echo '<div id="' . esc_attr( $tab ) . '-tab" class="settings-tab ' . esc_attr( $class ) . '">' . PHP_EOL;
+				echo '<div id="' . esc_attr( $tab ) . '-tab" class="settings-tab ' . esc_attr( $class ) . '">' . "\n";
 
 				do_action( $namespace . '_admin_page_tab_' . $tab . '_top' );
 
-				echo '<table cellpadding="0" cellspacing="0">' . PHP_EOL;
+				echo '<table cellpadding="0" cellspacing="0">' . "\n";
 
 				if ( count( $sections ) > 0 ) {
 
@@ -2268,16 +2365,16 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 							// --- section top ---
 							// 1.2.5: fix to mismatched class setting-section-bottom
-							echo '<tr class="setting-section-top"><td colspan="5">' . PHP_EOL;
+							echo '<tr class="setting-section-top"><td colspan="5">' . "\n";
 							// 1.2.5: use do_action directly instead of using stored output
 							do_action( $namespace . '_admin_page_section_' . $section . '_top' );
-							echo '</td></tr>' . PHP_EOL;
+							echo '</td></tr>' . "\n";
 
 							// --- section heading ---
 							if ( !isset( $sectionheadings[$section] ) ) {
-								echo '<tr class="setting-section">' . PHP_EOL;
-								echo '<td colspan="5"><h3>' . esc_html( $sectionlabel ) . '</h3></td>' . PHP_EOL;
-								echo '</tr>' . PHP_EOL;
+								echo '<tr class="setting-section">' . "\n";
+								echo '<td colspan="5"><h3>' . esc_html( $sectionlabel ) . '</h3></td>' . "\n";
+								echo '</tr>' . "\n";
 								$sectionheadings[$section] = true;
 							}
 
@@ -2287,13 +2384,13 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 								// 1.2.5: use wp_kses on setting row output with custom allowed HTML
 								echo wp_kses( $this->setting_row( $option ), $this->allowed_html( $option ) );
 							}
-							echo '<tr height="25"><td> </td></tr>' . PHP_EOL;
+							echo '<tr height="25"><td> </td></tr>' . "\n";
 
 							// --- section bottom hook ---
 							echo '<tr class="setting-section-bottom"><td colspan="5">';
 							// 1.2.5: use do_action directly instead of using stored output
 							do_action( $namespace . '_admin_page_section_' . $section . '_bottom' );
-							echo '</td></tr>' . PHP_EOL;
+							echo '</td></tr>' . "\n";
 
 						}
 
@@ -2301,23 +2398,23 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				} else {
 					foreach ( $taboptions[$tab]['general'] as $key => $option ) {
 						$option['key'] = $key;
-						echo '<tr height="25"><td> </td></tr>' . PHP_EOL;
+						echo '<tr height="25"><td> </td></tr>' . "\n";
 						// 1.2.5: use wp_kses_post on setting output with custom allowed HTML
 						echo wp_kses( $this->setting_row( $option ), $this->allowed_html( $option ) );
-						echo '<tr height="25"><td> </td></tr>' . PHP_EOL;
+						echo '<tr height="25"><td> </td></tr>' . "\n";
 					}
 				}
 
 				// --- reset/save settings buttons ---
 				// (filtered so removable from any specific tab)
-				$buttons = '<tr height="25"><td> </td></tr>' . PHP_EOL;
-				$buttons .= '<tr><td align="center">' . PHP_EOL;
+				$buttons = '<tr height="25"><td> </td></tr>' . "\n";
+				$buttons .= '<tr><td align="center">' . "\n";
 				// 1.2.5: remove reset onclick attribute
-				$buttons .= '<input type="button" id="settingsresetbutton" class="button-secondary settings-button" value="' . esc_attr( __( 'Reset Settings' ) ) . '">' . PHP_EOL;
-				$buttons .= '</td><td colspan="3"></td><td align="center">' . PHP_EOL;
-				$buttons .= '<input type="submit" class="button-primary settings-button" value="' . esc_attr( __( 'Save Settings' ) ) . '">' . PHP_EOL;
-				$buttons .= '</td></tr>' . PHP_EOL;
-				$buttons .= '<tr height="25"><td></td></tr>' . PHP_EOL;
+				$buttons .= '<input type="button" id="settingsresetbutton" class="button-secondary settings-button" value="' . esc_attr( __( 'Reset Settings', 'text-domain' ) ) . '">' . "\n";
+				$buttons .= '</td><td colspan="3"></td><td align="center">' . "\n";
+				$buttons .= '<input type="submit" class="button-primary settings-button" value="' . esc_attr( __( 'Save Settings', 'text-domain' ) ) . '">' . "\n";
+				$buttons .= '</td></tr>' . "\n";
+				$buttons .= '<tr height="25"><td></td></tr>' . "\n";
 				$buttons = apply_filters( $namespace . '_admin_save_buttons', $buttons, $tab );
 				if ( $buttons ) {
 					// 1.2.5: use wp_kses on filtered buttons output
@@ -2325,22 +2422,22 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 				}
 
 				// --- close table ---
-				echo '</table>' . PHP_EOL;
+				echo '</table>' . "\n";
 
 				// --- do below tab action ---
 				do_action( $namespace . '_admin_page_tab_' . $tab . '_bottom' );
 
 				// --- close tab output ---
-				echo '</div>' . PHP_EOL;
+				echo '</div>' . "\n";
 
 				$i++;
 			}
 
 			// --- close wrapbox ---
-			echo '</div></div>' . PHP_EOL;
+			echo '</div></div>' . "\n";
 
 			// --- close settings form ---
-			echo '</form>' . PHP_EOL;
+			echo '</form>' . "\n";
 
 			// --- enqueue settings resources ---
 			$this->settings_resources( $enqueued_media, $enqueued_color_picker );
@@ -2498,22 +2595,22 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			}
 
 			// --- prepare row output ---
-			$row = '<tr class="settings-row">' . PHP_EOL;
+			$row = '<tr class="settings-row">' . "\n";
 
-			$row .= '<td class="settings-label">' . $option['label'] . PHP_EOL;
+			$row .= '<td class="settings-label">' . $option['label'] . "\n";
 			if ( 'multiselect' == $type ) {
-				$row .= '<br><span>' . esc_html( __( 'Use Ctrl and Click to Select' ) ) . '</span>' . PHP_EOL;
+				$row .= '<br><span>' . esc_html( __( 'Use Ctrl and Click to Select', 'text-domain' ) ) . '</span>' . "\n";
 			}
-			$row .= '</td><td width="25"></td>' . PHP_EOL;
+			$row .= '</td><td width="25"></td>' . "\n";
 
 			// 1.0.9: added multiple cell spanning note type
 			if ( ( 'note' == $type ) || ( 'info' == $type ) || ( 'helper' == $type ) ) {
 
-				$row .= '<td class="settings-helper" colspan="3">' . PHP_EOL;
+				$row .= '<td class="settings-helper" colspan="3">' . "\n";
 				if ( isset( $option['helper'] ) ) {
 					$row .= $option['helper'];
 				}
-				$row .= '</td>' . PHP_EOL;
+				$row .= '</td>' . "\n";
 
 			} else {
 
@@ -2541,25 +2638,27 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					}
 					if ( $upgrade_link || isset( $pro_link ) ) {
 						// 1.2.2: change text from Available in Pro
-						$row .= __( 'Premium Feature.' ) . '<br>';
+						$row .= __( 'Premium Feature.', 'text-domain' ) . '<br>';
 						if ( $upgrade_link ) {
-							$row .= '<a href="' . esc_url( $upgrade_link ) . '"' . $upgrade_target . '>' . esc_html( __( 'Upgrade Now' ) ) . '</a>';
+							$row .= '<a href="' . esc_url( $upgrade_link ) . '"' . $upgrade_target . '>' . esc_html( __( 'Upgrade Now', 'text-domain' ) ) . '</a>';
 						}
 						if ( $upgrade_link && isset( $pro_link ) ) {
 							$row .= ' | ';
 						}
 						if ( isset( $pro_link ) ) {
 							// 1.2.2: change text from Pro details
-							$row .= '<a href="' . esc_url( $pro_link ) . '"' . $pro_target . '>' . esc_html( __( 'Details' ) ) . '</a>' . PHP_EOL;
+							// 1.3.0: add hash link anchor for Pro feature options
+							$option_anchor = str_replace( '_', '-', $option['key'] );
+							$row .= '<a href="' . esc_url( $pro_link ) . '#' . esc_attr( $option_anchor ) . '"' . $pro_target . '>' . esc_html( __( 'Details', 'text-domain' ) ) . '</a>' . "\n";
 						}
 					} else {
-						$row .= esc_html( __( 'Coming soon in Pro version!' ) );
+						$row .= esc_html( __( 'Coming soon in Pro version!', 'text-domain' ) );
 					}
-					$row .= '</td>' . PHP_EOL;
+					$row .= '</td>' . "\n";
 
 				} else {
 
-					$row .= '<td class="settings-input">' . PHP_EOL;
+					$row .= '<td class="settings-input">' . "\n";
 
 					// --- maybe prepare special options ---
 					if ( isset( $option['options'] ) && is_string( $option['options'] ) ) {
@@ -2568,18 +2667,19 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						if ( in_array( $option['options'], array( 'POSTID', 'POSTIDS', 'PAGEID', 'PAGEIDS' ) ) ) {
 
 							$posttype = strtolower( substr( $option['options'], 0, 4 ) );
-							if ( ( ( 'page' == $posttype ) && !isset( $pageoptions ) )
-								|| ( ( 'post' == $posttype ) && !isset( $postoptions ) ) ) {
+							if ( ( ( 'page' == $posttype ) && !isset( $pageoptions ) ) || ( ( 'post' == $posttype ) && !isset( $postoptions ) ) ) {
+
 								global $wpdb;
-								$query = "SELECT ID,post_title,post_status FROM " . $wpdb->prefix . "posts";
-								$query .= " WHERE post_type = %s AND post_status != 'auto-draft'";
-								// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-								$query = $wpdb->prepare( $query, $posttype );
-								// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-								$results = $wpdb->get_results( $query, ARRAY_A );
+								$results = $wpdb->get_results( $wpdb->prepare( "SELECT ID,post_title,post_status FROM " . $wpdb->prefix . "posts WHERE post_type = %s AND post_status != 'auto-draft'", $posttype ), ARRAY_A );
 
 								// 1.2.7: fix by moving page/post options variable here
-								$pageoptions = $postoptions = array( '' => '' );
+								// 1.3.0: check separately to avoid overwriting existing options
+								if ( !isset( $pageoptions ) ) {
+									$pageoptions = array( '' => '' );
+								}
+								if ( !isset( $postoptions ) ) {
+									$postoptions = array( '' => '' );
+								}
 								if ( $results && ( count( $results ) > 0 ) ) {
 									foreach ( $results as $result ) {
 										if ( strlen( $result['post_title'] ) > 35 ) {
@@ -2655,10 +2755,10 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 								$userkey = 'username';
 							}
 							$useroptions = array( '' => '' );
+
 							global $wpdb;
-							$query = "SELECT ID,user_login,display_name FROM " . $wpdb->prefix . "users";
 							// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-							$results = $wpdb->get_results( $query, ARRAY_A );
+							$results = $wpdb->get_results( "SELECT ID,user_login,display_name FROM " . $wpdb->prefix . "users", ARRAY_A );
 							if ( $results && ( count( $results ) > 0 ) ) {
 								foreach ( $results as $result ) {
 									$label = $result['ID'] . ': ' . $result['display_name'];
@@ -2688,9 +2788,9 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						}
 						$checked = ( $setting == $option['value'] ) ? ' checked="checked"' : '';
 						$row .= '<label for="' . esc_attr( $name ) . '" class="setting-toggle">';
-						$row .= '<input type="checkbox" name="' . esc_attr( $name ) . '" class="setting-toggle" value="' . esc_attr( $option['value'] ) . '"' . $checked . '>' . PHP_EOL;
-						$row .= '<span class="setting-slider round"></span>' . PHP_EOL;
-						$row .= '</label>' . PHP_EOL;
+						$row .= '<input type="checkbox" name="' . esc_attr( $name ) . '" class="setting-toggle" value="' . esc_attr( $option['value'] ) . '"' . $checked . '>' . "\n";
+						$row .= '<span class="setting-slider round"></span>' . "\n";
+						$row .= '</label>' . "\n";
 						if ( isset( $option['suffix'] ) ) {
 							$row .= ' ' . $option['suffix'];
 						}
@@ -2703,7 +2803,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							$option['value'] = '1';
 						}
 						$checked = ( $setting == $option['value'] ) ? ' checked="checked"' : '';
-						$row .= '<input type="checkbox" name="' . esc_attr( $name ) . '" class="setting-checkbox" value="' . esc_attr( $option['value'] ) . '"' . $checked . '>' . PHP_EOL;
+						$row .= '<input type="checkbox" name="' . esc_attr( $name ) . '" class="setting-checkbox" value="' . esc_attr( $option['value'] ) . '"' . $checked . '>' . "\n";
 						if ( isset( $option['suffix'] ) ) {
 							$row .= ' ' . $option['suffix'];
 						}
@@ -2717,7 +2817,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							if ( is_array( $setting ) && in_array( $key, $setting ) ) {
 								$checked = ' checked="checked"';
 							}
-							$checkboxes[] = '<input type="checkbox" name="' . esc_attr( $name ) . "-" . esc_attr( $key ) . '" class="setting-checkbox" value="yes"' . $checked . '> ' . esc_html( $label ) . PHP_EOL;
+							$checkboxes[] = '<input type="checkbox" name="' . esc_attr( $name ) . "-" . esc_attr( $key ) . '" class="setting-checkbox" value="yes"' . $checked . '> ' . esc_html( $label ) . "\n";
 						}
 						$row .= implode( '<br>', $checkboxes );
 
@@ -2727,25 +2827,25 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						$radios = array();
 						foreach ( $option['options'] as $value => $label ) {
 							$checked = ( $setting == $value ) ? ' checked="checked"' : '';
-							$radios[] = '<input type="radio" class="setting-radio" name="' . esc_attr( $name ) . "' value='" . esc_attr( $value ) . '"' . $checked . '> ' . esc_html( $label ) . PHP_EOL;
+							$radios[] = '<input type="radio" class="setting-radio" name="' . esc_attr( $name ) . "' value='" . esc_attr( $value ) . '"' . $checked . '> ' . esc_html( $label ) . "\n";
 						}
 						$row .= implode( '<br>', $radios );
 
 					} elseif ( 'select' == $type ) {
 
 						// --- select dropdown ---
-						$row .= '<select class="setting-select" name="' . esc_attr( $name ) . '">' . PHP_EOL;
+						$row .= '<select class="setting-select" name="' . esc_attr( $name ) . '">' . "\n";
 						foreach ( $option['options'] as $value => $label ) {
 							// 1.0.9: support option grouping (set unique key containing OPTGROUP-)
 							if ( strstr( $value, '*OPTGROUP*' ) ) {
-								$row .= '<optgroup label="' . esc_attr( $label ) . '">' . esc_html( $label ) . '</optgroup>' . PHP_EOL;
+								$row .= '<optgroup label="' . esc_attr( $label ) . '">' . esc_html( $label ) . '</optgroup>' . "\n";
 							} else {
 								// 1.1.3: remove strict value checking
 								$row .= '<option value="' . esc_attr( $value ) . '"';
 								if ( $setting == $value ) {
 									$row .= ' selected="selected"';
 								}
-								$row .= '>' . esc_html( $label ) . '</option>' . PHP_EOL;
+								$row .= '>' . esc_html( $label ) . '</option>' . "\n";
 							}
 						}
 						$row .= '</select>';
@@ -2756,19 +2856,15 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					} elseif ( 'multiselect' == $type ) {
 
 						// --- multiselect dropdown ---
-						$row .= '<select multiple="multiple" class="setting-select" name="' . esc_attr( $name ) . '[]">' . PHP_EOL;
+						$row .= '<select multiple="multiple" class="setting-select" name="' . esc_attr( $name ) . '[]">' . "\n";
 						foreach ( $option['options'] as $value => $label ) {
 							if ( '' != $value ) {
 								// 1.1.3: check for OPTGROUP instead of *OPTGROUP*
 								if ( strstr( $value, 'OPTGROUP' ) ) {
-									$row .= '<optgroup label="' . esc_attr( $label ) . '">' . PHP_EOL;
+									$row .= '<optgroup label="' . esc_attr( $label ) . '">' . "\n";
 								} else {
-									if ( is_array( $setting ) && in_array( $value, $setting ) ) {
-										$selected = ' selected="selected"';
-									} else {
-										$selected = '';
-									}
-									$row .= '<option value="' . esc_attr( $value ) . '"' . $selected . ">" . esc_html( $label ) . '</option>' . PHP_EOL;
+									$selected = ( is_array( $setting ) && in_array( $value, $setting ) ) ? ' selected="selected"' : '';
+									$row .= '<option value="' . esc_attr( $value ) . '"' . $selected . ">" . esc_html( $label ) . '</option>' . "\n";
 								}
 							}
 						}
@@ -2792,7 +2888,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							$placeholder = '';
 						}
 						// 1.1.7: fix to attribute quoting output
-						$row .= '<input type="text" name="' . esc_attr( $name ) . '" class="' . esc_attr( $class ) . '" value="' . esc_attr( $setting ) . '" placeholder="' . esc_attr( $placeholder ) . '">' . PHP_EOL;
+						$row .= '<input type="text" name="' . esc_attr( $name ) . '" class="' . esc_attr( $class ) . '" value="' . esc_attr( $setting ) . '" placeholder="' . esc_attr( $placeholder ) . '">' . "\n";
 						if ( isset( $option['suffix'] ) ) {
 							$row .= ' ' . $option['suffix'];
 						}
@@ -2811,7 +2907,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 							$placeholder = '';
 						}
 						// 1.2.4: added missing esc_textarea on value
-						$row .= '<textarea class="setting-textarea" name="' . esc_attr( $name ) . '" rows="' . esc_attr( $rows ) . '" placeholder="' . esc_attr( $placeholder ) . '">' . esc_textarea( $setting ) . '</textarea>' . PHP_EOL;
+						$row .= '<textarea class="setting-textarea" name="' . esc_attr( $name ) . '" rows="' . esc_attr( $rows ) . '" placeholder="' . esc_attr( $placeholder ) . '">' . esc_textarea( $setting ) . '</textarea>' . "\n";
 
 					} elseif ( ( 'numeric' == $type ) || ( 'number' == $type ) ) {
 
@@ -2839,20 +2935,20 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						}
 
 						// 1.1.7: remove esc_js from onclick attributes
-						// $onclickdown = "plugin_panel_number_step('down', '" . esc_attr( $name ) . "', " . esc_attr( $min ) . ", " . esc_attr( $max ) . ", " . esc_attr( $step ) . ");" . PHP_EOL;
-						// $row .= '<input class="setting-button button-secondary" type="button" value="-" onclick="' . $onclickdown . '">' . PHP_EOL;
-						$row .= '<input class="number-button number-down-button setting-button button-secondary" type="button" value="-" data="' . esc_attr( $name ) . '">' . PHP_EOL;
+						// $onclickdown = "plugin_panel_number_step('down', '" . esc_attr( $name ) . "', " . esc_attr( $min ) . ", " . esc_attr( $max ) . ", " . esc_attr( $step ) . ");" . "\n";
+						// $row .= '<input class="setting-button button-secondary" type="button" value="-" onclick="' . $onclickdown . '">' . "\n";
+						$row .= '<input class="number-button number-down-button setting-button button-secondary" type="button" value="-" data="' . esc_attr( $name ) . '">' . "\n";
 						if ( isset( $option['prefix'] ) ) {
 							$row .= ' ' . $option['prefix'];
 						}
 						$data = esc_attr( $min ) . "," . esc_attr( $max ) . "," . esc_attr( $step );
-						$row .= '<input id="number-input-' . esc_attr( $name ) . '" class="setting-numeric" type="text" name="' . esc_attr( $name ) . '" value="' . esc_attr( $setting ) . '" placeholder="' . esc_attr( $placeholder ) . '" data="' . esc_attr( $data ) . '">' . PHP_EOL;
+						$row .= '<input id="number-input-' . esc_attr( $name ) . '" class="setting-numeric" type="text" name="' . esc_attr( $name ) . '" value="' . esc_attr( $setting ) . '" placeholder="' . esc_attr( $placeholder ) . '" data="' . esc_attr( $data ) . '">' . "\n";
 						if ( isset( $option['suffix'] ) ) {
 							$row .= ' ' . $option['suffix'];
 						}
-						// $onclickup = "plugin_panel_number_step('up', '" . esc_attr( $name ) . "', " . esc_attr( $min ) . ", " . esc_attr( $max ) . ", " . esc_attr( $step ) . ");" . PHP_EOL;
-						// $row .= '<input class="setting-button button-secondary" type="button" value="+" onclick="' . $onclickup . '">' . PHP_EOL;
-						$row .= '<input class="number-button number-up-button setting-button button-secondary" type="button" value="+" data="' . esc_attr( $name ) . '">' . PHP_EOL;
+						// $onclickup = "plugin_panel_number_step('up', '" . esc_attr( $name ) . "', " . esc_attr( $min ) . ", " . esc_attr( $max ) . ", " . esc_attr( $step ) . ");" . "\n";
+						// $row .= '<input class="setting-button button-secondary" type="button" value="+" onclick="' . $onclickup . '">' . "\n";
+						$row .= '<input class="number-button number-up-button setting-button button-secondary" type="button" value="+" data="' . esc_attr( $name ) . '">' . "\n";
 
 
 					} elseif ( 'image' == $type ) {
@@ -2866,42 +2962,42 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 						// --- image container ---
 						$row .= '<div class="custom-image-container">';
 						if ( $has_image ) {
-							$row .= '<img src="' . esc_url( $image[0] ) . '" alt="" style="max-width:100%;">' . PHP_EOL;
+							$row .= '<img src="' . esc_url( $image[0] ) . '" alt="" style="max-width:100%;">' . "\n";
 						}
-						$row .= '</div>' . PHP_EOL;
+						$row .= '</div>' . "\n";
 
 						// --- add and remove links ---
 						$upload_link = get_upload_iframe_src( 'image' );
-						$row .= '<p class="hide-if-no-js">' . PHP_EOL;
+						$row .= '<p class="hide-if-no-js">' . "\n";
 							$hidden = '';
 							if ( $has_image ) {
 								$hidden = ' hidden';
 							}
-							$row .= '<a class="upload-custom-image' . esc_attr( $hidden ) . '" href="' . esc_url( $upload_link ) . '">' . PHP_EOL;
-							$row .= esc_html( __( 'Add Image' ) );
-							$row .= '</a>' . PHP_EOL;
+							$row .= '<a class="upload-custom-image' . esc_attr( $hidden ) . '" href="' . esc_url( $upload_link ) . '">' . "\n";
+							$row .= esc_html( __( 'Add Image', 'text-domain' ) );
+							$row .= '</a>' . "\n";
 
 							$hidden = '';
 							if ( !$has_image ) {
 								$hidden = ' hidden';
 							}
-							$row .= '<a class="delete-custom-image' . esc_attr( $hidden ) . '" href="#">' . PHP_EOL;
-							$row .= esc_html( __( 'Remove Image' ) );
-							$row .= '</a>' . PHP_EOL;
-						$row .= '</p>' . PHP_EOL;
+							$row .= '<a class="delete-custom-image' . esc_attr( $hidden ) . '" href="#">' . "\n";
+							$row .= esc_html( __( 'Remove Image', 'text-domain' ) );
+							$row .= '</a>' . "\n";
+						$row .= '</p>' . "\n";
 
 						// --- hidden input for image ID ---
-						$row .= '<input class="custom-image-id" name="' . esc_attr( $name ) . '" type="hidden" value="' . esc_attr( $setting ) . '">' . PHP_EOL;
+						$row .= '<input class="custom-image-id" name="' . esc_attr( $name ) . '" type="hidden" value="' . esc_attr( $setting ) . '">' . "\n";
 
 					} elseif ( 'color' == $type ) {
 
 						// 1.1.7: added color picker field
-						$row .= '<input type="text" class="color-picker" data-default-color="' . esc_attr( $option['default'] ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $setting ) . '">' . PHP_EOL;
+						$row .= '<input type="text" class="color-picker" data-default-color="' . esc_attr( $option['default'] ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $setting ) . '">' . "\n";
 
 					} elseif ( 'coloralpha' == $type ) {
 
 						// 1.1.7: added color picker alpha field
-						$row .= '<input type="text" class="color-picker" data-alpha-enabled="true" data-default-color="' . esc_attr( $option['default'] ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $setting ) . '">' . PHP_EOL;
+						$row .= '<input type="text" class="color-picker" data-alpha-enabled="true" data-default-color="' . esc_attr( $option['default'] ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $setting ) . '">' . "\n";
 
 					}
 
@@ -2910,15 +3006,15 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 				// --- setting helper text ---
 				if ( isset( $option['helper'] ) ) {
-					$row .= '<td width="25"></td>' . PHP_EOL;
-					$row .= '<td class="settings-helper">' . esc_html( $option['helper'] ) . '</td>' . PHP_EOL;
+					$row .= '<td width="25"></td>' . "\n";
+					$row .= '<td class="settings-helper">' . esc_html( $option['helper'] ) . '</td>' . "\n";
 				}
 			}
 
-			$row .= '</tr>' . PHP_EOL;
+			$row .= '</tr>' . "\n";
 
 			// --- settings row spacer ---
-			$row .= '<tr class="settings-spacer"><td> </td></tr>' . PHP_EOL;
+			$row .= '<tr class="settings-spacer"><td> </td></tr>' . "\n";
 
 			// --- filter and return setting row ---
 			$row = apply_filters( $namespace . '_setting_row', $row, $option );
@@ -2943,36 +3039,36 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 
 						// --- output tab switcher function ---
 						// 1.2.5: changed function prefix for consistency
-						/* echo "function plugin_panel_display_tab(tab) {" . PHP_EOL;
+						/* echo "function plugin_panel_display_tab(tab) {" . "\n";
 						foreach ( $tabs as $tab => $label ) {
-							echo "	document.getElementById('" . esc_js( $tab ) . "-tab-button').className = 'settings-tab-button inactive';" . PHP_EOL;
-							echo "	document.getElementById('" . esc_js( $tab ) . "-tab').className = 'settings-tab inactive'; " . PHP_EOL;
+							echo "	document.getElementById('" . esc_js( $tab ) . "-tab-button').className = 'settings-tab-button inactive';" . "\n";
+							echo "	document.getElementById('" . esc_js( $tab ) . "-tab').className = 'settings-tab inactive'; " . "\n";
 						}
-						echo "	document.getElementById(tab+'-tab-button').className = 'settings-tab-button active';" . PHP_EOL;
-						echo "	document.getElementById(tab+'-tab').className = 'settings-tab active';" . PHP_EOL;
-						echo "	document.getElementById('settings-tab').value = tab;" . PHP_EOL;
-						echo "}" . PHP_EOL; */
+						echo "	document.getElementById(tab+'-tab-button').className = 'settings-tab-button active';" . "\n";
+						echo "	document.getElementById(tab+'-tab').className = 'settings-tab active';" . "\n";
+						echo "	document.getElementById('settings-tab').value = tab;" . "\n";
+						echo "}" . "\n"; */
 
 						// 1.2.5: use jQuery click function to remove onclick button attributes
-						echo "jQuery('.settings-tab-button').on('click', function() {" . PHP_EOL;
-						echo "	tab = jQuery(this).attr('id').replace('-tab-button','');" . PHP_EOL;
-						echo "	jQuery('.settings-tab,.settings-tab-button').removeClass('active').addClass('inactive');" . PHP_EOL;
-						echo "	jQuery('#'+tab+'-tab,#'+tab+'-tab-button').removeClass('inactive').addClass('active');" . PHP_EOL;
-						echo "	jQuery('#settings-tab').val(tab);" . PHP_EOL;
-						echo "});" . PHP_EOL;
+						echo "jQuery('.settings-tab-button').on('click', function() {" . "\n";
+						echo "	tab = jQuery(this).attr('id').replace('-tab-button','');" . "\n";
+						echo "	jQuery('.settings-tab,.settings-tab-button').removeClass('active').addClass('inactive');" . "\n";
+						echo "	jQuery('#'+tab+'-tab,#'+tab+'-tab-button').removeClass('inactive').addClass('active');" . "\n";
+						echo "	jQuery('#settings-tab').val(tab);" . "\n";
+						echo "});" . "\n";
 
 					} elseif ( 'settings_reset' == $script ) {
 
 						// --- reset settings function ---
 						// 1.2.5: changed function prefix for consistency
 						// 1.2.5: changed to jQuery click function to remove onclick button attribute
-						$confirmreset = __( 'Are you sure you want to reset to default settings?' );
-						// echo "function plugin_panel_reset_defaults() {" . PHP_EOL;
-						echo "jQuery('#settingsresetbutton').on('click', function() {" . PHP_EOL;
-						echo "	agree = confirm('" . esc_js( $confirmreset ) . "');" . PHP_EOL;
-						echo "	if (!agree) {return false;}" . PHP_EOL;
-						echo "	document.getElementById('settings-action').value = 'reset';" . PHP_EOL;
-						echo "	document.getElementById('settings-form').submit();" . PHP_EOL;
+						$confirmreset = __( 'Are you sure you want to reset to default settings?', 'text-domain' );
+						// echo "function plugin_panel_reset_defaults() {" . "\n";
+						echo "jQuery('#settingsresetbutton').on('click', function() {" . "\n";
+						echo "	agree = confirm('" . esc_js( $confirmreset ) . "');" . "\n";
+						echo "	if (!agree) {return false;}" . "\n";
+						echo "	document.getElementById('settings-action').value = 'reset';" . "\n";
+						echo "	document.getElementById('settings-form').submit();" . "\n";
 						echo "});" . "\n";
 						// echo "}" . "\n";
 
@@ -3007,7 +3103,7 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 					} elseif ( 'media_functions' == $script ) {
 
 						// --- media functions ---
-						$confirm_remove = __( 'Are you sure you want to remove this image?' );
+						$confirm_remove = __( 'Are you sure you want to remove this image?', 'text-domain' );
 						echo "jQuery(function(){
 
 							var mediaframe, parentdiv;
@@ -3149,10 +3245,10 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 			// --- filter and output styles ---
 			$namespace = $this->namespace;
 			$styles = apply_filters( $namespace . '_admin_page_styles', $styles );
-			echo "<style>";
 			// 1.2.5: added wp_strip_all_tags to styles output
-			echo wp_strip_all_tags( implode( "\n", $styles ) );
-			echo "</style>";
+			// 1.3.0: use wp_kses_post on styles output
+			// echo wp_strip_all_tags( implode( "\n", $styles ) );
+			echo "<style>" . wp_kses_post( implode( "\n", $styles ) ) . "</style>";
 
 		}
 
@@ -3168,10 +3264,10 @@ if ( !class_exists( 'PREFIX_loader' ) ) {
 // to more easily call the matching plugin loader class methods
 
 // 1.0.3: added priority of 0 to prefixed function loading action
-add_action( 'plugins_loaded', 'PREFIX_load_prefixed_functions', 0 );
+add_action( 'plugins_loaded', 'loader_prefix_load_prefixed_functions', 0 );
 
-if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
-	function PREFIX_load_prefixed_functions() {
+if ( !function_exists( 'loader_prefix_load_prefixed_functions' ) ) {
+	function loader_prefix_load_prefixed_functions() {
 
 		// ------------------
 		// Get Namespace Slug
@@ -3180,8 +3276,8 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// the below functions use the function name to grab and load the corresponding class method
 		// all function name suffixes here must be two words for the magic namespace grabber to work
 		// ie. _add_settings, because the namespace is taken from *before the second-last underscore*
-		if ( !function_exists( 'PREFIX_get_namespace_from_function' ) ) {
-			function PREFIX_get_namespace_from_function( $f ) {
+		if ( !function_exists( 'loader_prefix_get_namespace_from_function' ) ) {
+			function loader_prefix_get_namespace_from_function( $f ) {
 				return substr( $f, 0, strrpos( $f, '_', ( strrpos( $f, '_' ) - strlen( $f ) - 1 ) ) );
 			}
 		}
@@ -3190,9 +3286,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Loader Instance
 		// -------------------
 		// 2.3.0: added function for getting loader class instance
-		if ( !function_exists( 'PREFIX_loader_instance' ) ) {
-			function PREFIX_loader_instance() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_loader_instance' ) ) {
+			function loader_prefix_loader_instance() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_instance'];
 			}
@@ -3202,9 +3298,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Freemius Instance
 		// ---------------------
 		// 2.3.0: added function for getting Freemius class instance
-		if ( !function_exists( 'PREFIX_freemius_instance' ) ) {
-			function PREFIX_freemius_instance() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_freemius_instance' ) ) {
+			function loader_prefix_freemius_instance() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 
 				return $GLOBALS[$namespace . '_freemius'];
 			}
@@ -3214,9 +3310,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Plugin Data
 		// ---------------
 		// 1.1.1: added function for getting plugin data
-		if ( !function_exists( 'PREFIX_plugin_data' ) ) {
-			function PREFIX_plugin_data() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_plugin_data' ) ) {
+			function loader_prefix_plugin_data() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_data();
@@ -3227,9 +3323,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get Plugin Version
 		// ------------------
 		// 1.1.2: added function for getting plugin version
-		if ( !function_exists( 'PREFIX_plugin_version' ) ) {
-			function PREFIX_plugin_version() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_plugin_version' ) ) {
+			function loader_prefix_plugin_version() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->plugin_version();
@@ -3239,9 +3335,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------------
 		// Set Pro Namespace
 		// -----------------
-		if ( !function_exists( 'PREFIX_pro_namespace' ) ) {
-			function PREFIX_pro_namespace( $pronamespace ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_pro_namespace' ) ) {
+			function loader_prefix_pro_namespace( $pronamespace ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->pro_namespace( $pronamespace );
 			}
@@ -3254,9 +3350,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ------------
 		// Add Settings
 		// ------------
-		if ( !function_exists( 'PREFIX_add_settings' ) ) {
-			function PREFIX_add_settings() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_add_settings' ) ) {
+			function loader_prefix_add_settings() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->add_settings();
 			}
@@ -3265,9 +3361,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ------------
 		// Get Defaults
 		// ------------
-		if ( !function_exists( 'PREFIX_default_settings' ) ) {
-			function PREFIX_default_settings( $key = false ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_default_settings' ) ) {
+			function loader_prefix_default_settings( $key = false ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->default_settings( $key );
@@ -3277,9 +3373,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Options
 		// -----------
-		if ( !function_exists( 'PREFIX_get_options' ) ) {
-			function PREFIX_get_options() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_get_options' ) ) {
+			function loader_prefix_get_options() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->options;
@@ -3289,9 +3385,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------
 		// Get Setting
 		// -----------
-		if ( !function_exists( 'PREFIX_get_setting' ) ) {
-			function PREFIX_get_setting( $key, $filter = true ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_get_setting' ) ) {
+			function loader_prefix_get_setting( $key, $filter = true ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_setting( $key, $filter );
@@ -3302,9 +3398,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Get All Settings
 		// ----------------
 		// 1.0.9: added missing get_settings prefixed function
-		if ( !function_exists( 'PREFIX_get_settings' ) ) {
-			function PREFIX_get_settings( $filter = true ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_get_settings' ) ) {
+			function loader_prefix_get_settings( $filter = true ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->get_settings( $filter );
@@ -3314,9 +3410,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// --------------
 		// Reset Settings
 		// --------------
-		if ( !function_exists( 'PREFIX_reset_settings' ) ) {
-			function PREFIX_reset_settings() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_reset_settings' ) ) {
+			function loader_prefix_reset_settings() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->reset_settings();
 			}
@@ -3325,9 +3421,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ---------------
 		// Update Settings
 		// ---------------
-		if ( !function_exists( 'PREFIX_update_settings' ) ) {
-			function PREFIX_update_settings() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_update_settings' ) ) {
+			function loader_prefix_update_settings() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->update_settings();
 			}
@@ -3336,9 +3432,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ---------------
 		// Delete Settings
 		// ---------------
-		if ( !function_exists( 'PREFIX_delete_settings' ) ) {
-			function PREFIX_delete_settings() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_delete_settings' ) ) {
+			function loader_prefix_delete_settings() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->delete_settings();
 			}
@@ -3349,9 +3445,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -----------
 		// Message Box
 		// -----------
-		if ( !function_exists( 'PREFIX_message_box' ) ) {
-			function PREFIX_message_box( $message, $echo = false ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_message_box' ) ) {
+			function loader_prefix_message_box( $message, $echo = false ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 
 				return $instance->message_box( $message, $echo );
@@ -3361,9 +3457,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// ---------------
 		// Settings Header
 		// ---------------
-		if ( !function_exists( 'PREFIX_settings_header' ) ) {
-			function PREFIX_settings_header() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_settings_header' ) ) {
+			function loader_prefix_settings_header() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_header();
 			}
@@ -3372,9 +3468,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// -------------
 		// Settings Page
 		// -------------
-		if ( !function_exists( 'PREFIX_settings_page' ) ) {
-			function PREFIX_settings_page() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_settings_page' ) ) {
+			function loader_prefix_settings_page() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_page();
 			}
@@ -3384,9 +3480,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Settings Table
 		// --------------
 		// 1.0.9: added for standalone setting table output
-		if ( !function_exists( 'PREFIX_settings_table' ) ) {
-			function PREFIX_settings_table() {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_settings_table' ) ) {
+			function loader_prefix_settings_table() {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_table();
 			}
@@ -3396,9 +3492,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Settings Row
 		// ------------
 		// 1.0.9: added for standalone setting row output
-		if ( !function_exists( 'PREFIX_settings_row' ) ) {
-			function PREFIX_settings_row( $option, $setting ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_settings_row' ) ) {
+			function loader_prefix_settings_row( $option, $setting ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_row( $option, $setting );
 			}
@@ -3408,9 +3504,9 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 		// Settings Resources
 		// ------------------
 		// 1.2.3: added for separate enqueueing of resources from table
-		if ( !function_exists( 'PREFIX_settings_resources' ) ) {
-			function PREFIX_settings_resources( $media, $color_picker ) {
-				$namespace = PREFIX_get_namespace_from_function( __FUNCTION__ );
+		if ( !function_exists( 'loader_prefix_settings_resources' ) ) {
+			function loader_prefix_settings_resources( $media, $color_picker ) {
+				$namespace = loader_prefix_get_namespace_from_function( __FUNCTION__ );
 				$instance = $GLOBALS[$namespace . '_instance'];
 				$instance->settings_resources( $media, $color_picker );
 			}
@@ -3424,52 +3520,22 @@ if ( !function_exists( 'PREFIX_load_prefixed_functions' ) ) {
 
 
 // =========
-// STRUCTURE
-// =========
-//
-// === Loader Class ===
-// - Initialize Loader
-// - Setup Plugin
-// - Get Plugin Data
-// - Get Plugin Version
-// - Set Pro Namespace
-// === Plugin Settings ===
-// - Get Default Settings
-// - Add Settings
-// - Maybe Transfer Settings
-// - Get All Plugin Settings
-// - Get Plugin Setting
-// - Reset Plugin Settings
-// - Update Plugin Settings
-// - Validate Plugin Setting
-// === Plugin Loading ===
-// - Load Plugin Settings
-// - Add Actions
-// - Load Helper Libraries
-// - Maybe Load Thickbox
-// - Readme Viewer AJAX
-// === Freemius Loading ===
-// - Load Freemius
-// - Filter Freemius Connect
-// - Freemius Connect Message
-// - Connect Update Message
-// === Plugin Admin ===
-// - Add Settings Menu
-// - Plugin Page Links
-// - Message Box
-// - Notice Boxer
-// - Plugin Page Header
-// - Settings Page
-// - Settings Table
-// - Setting Row
-// - Settings Scripts
-// - Settings Styles
-// === Namespaced Functions ===
-
-
-// =========
 // CHANGELOG
 // =========
+
+// == 1.3.1 ==
+// - use prefixed markdown reader function
+// - when reading strip any license lines causing breakage
+// - update to color picker alpha library (3.0.4)
+// - added text domain to translation wrappers (for replacing)
+
+// == 1.3.0 ==
+// - fix for possible page/post options conflict
+// - added explicit email option field type
+// - added fallback to text option firld type
+// - added check if pro slug data is a string
+// - added Freemius has_affiliation key
+// - added hash link anchor for Pro feature options
 
 // == 1.2.9 ==
 // - fix empty number field converting to NaN value
